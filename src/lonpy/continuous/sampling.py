@@ -46,13 +46,15 @@ class BasinHoppingSamplerConfig:
 
 class BasinHoppingSampler:
     """
-    Basin-Hopping sampler for constructing Local Optima Networks.
+    Basin-Hopping sampler for constructing Local Optima Networks (continuous).
 
     Basin-Hopping is a global optimization algorithm that combines random
     perturbations with local minimization. This implementation records
     transitions between local optima for LON construction.
 
     Example:
+        >>> from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
+        >>>
         >>> config = BasinHoppingSamplerConfig(n_runs=10, n_iterations=1000)
         >>> sampler = BasinHoppingSampler(config)
         >>> lon = sampler.sample_to_lon(objective_func, domain)
@@ -60,21 +62,24 @@ class BasinHoppingSampler:
 
     def __init__(self, config: BasinHoppingSamplerConfig | None = None):
         self.config = config or BasinHoppingSamplerConfig()
+        self._rng: np.random.Generator = np.random.default_rng()
 
-    def bounded_perturbation(
+    def _bounded_perturbation(
         self,
         x: np.ndarray,
         p: np.ndarray,
         domain: list[tuple[float, float]],
     ) -> np.ndarray:
-        y = x + np.random.uniform(low=-p, high=p)
+        y = x + self._rng.uniform(low=-p, high=p)
         bounds = np.array(domain)
-        return np.clip(y, bounds[:, 0], bounds[:, 1])
+        result: np.ndarray = np.clip(y, bounds[:, 0], bounds[:, 1])
+        return result
 
-    def unbounded_perturbation(self, x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return x + np.random.uniform(low=-p, high=p)
+    def _unbounded_perturbation(self, x: np.ndarray, p: np.ndarray) -> np.ndarray:
+        result: np.ndarray = x + self._rng.uniform(low=-p, high=p)
+        return result
 
-    def hash_solution(self, x: np.ndarray, fitness: float = 0.0) -> str:  # noqa: ARG002
+    def _hash_solution(self, x: np.ndarray) -> str:
         """
         Create hash string for a solution.
 
@@ -83,7 +88,6 @@ class BasinHoppingSampler:
 
         Args:
             x: Solution coordinates.
-            fitness: Fitness value (unused, kept for API compatibility).
 
         Returns:
             Hash string identifying the local optimum.
@@ -96,7 +100,7 @@ class BasinHoppingSampler:
         hash_str = "_".join(f"{v:.{max(0, self.config.hash_digits)}f}" for v in rounded)
         return hash_str
 
-    def fitness_to_int(self, fitness: float) -> int:
+    def _fitness_to_int(self, fitness: float) -> int:
         """
         Convert fitness to integer representation for storage.
 
@@ -128,11 +132,12 @@ class BasinHoppingSampler:
         Returns:
             Tuple of (trace_df, raw_records):
                 - trace_df: DataFrame with columns [run, fit1, node1, fit2, node2]
-                  ready for LON construction.
                 - raw_records: List of dicts with detailed iteration data.
         """
         if self.config.seed is not None:
-            np.random.seed(self.config.seed)
+            self._rng = np.random.default_rng(self.config.seed)
+        else:
+            self._rng = np.random.default_rng()
 
         n_var = len(domain)
 
@@ -153,7 +158,7 @@ class BasinHoppingSampler:
                 progress_callback(run, self.config.n_runs)
 
             # Random initial point
-            x0 = np.array([np.random.uniform(d[0], d[1]) for d in domain])
+            x0 = np.array([self._rng.uniform(d[0], d[1]) for d in domain])
 
             if self.config.bounded:
                 res = minimize(
@@ -180,7 +185,7 @@ class BasinHoppingSampler:
 
             for iteration in range(1, self.config.n_iterations + 1):
                 if self.config.bounded:
-                    x_perturbed = self.bounded_perturbation(current_x, p, domain)
+                    x_perturbed = self._bounded_perturbation(current_x, p, domain)
                     res = minimize(
                         func,
                         x_perturbed,
@@ -189,7 +194,7 @@ class BasinHoppingSampler:
                         options=self.config.minimizer_options,
                     )
                 else:
-                    x_perturbed = self.unbounded_perturbation(current_x, p)
+                    x_perturbed = self._unbounded_perturbation(current_x, p)
                     res = minimize(
                         func,
                         x_perturbed,
@@ -218,10 +223,10 @@ class BasinHoppingSampler:
 
                 # Acceptance criterion (minimization: accept if better or equal)
                 if new_f <= current_f:
-                    node1 = self.hash_solution(current_x, current_f)
-                    node2 = self.hash_solution(new_x, new_f)
-                    fit1 = self.fitness_to_int(current_f)
-                    fit2 = self.fitness_to_int(new_f)
+                    node1 = self._hash_solution(current_x)
+                    node2 = self._hash_solution(new_x)
+                    fit1 = self._fitness_to_int(current_f)
+                    fit2 = self._fitness_to_int(new_f)
 
                     trace_records.append(
                         {
