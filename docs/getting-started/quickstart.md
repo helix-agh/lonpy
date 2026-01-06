@@ -2,7 +2,9 @@
 
 This guide will get you up and running with lonpy in just a few minutes.
 
-## Your First LON
+## Continuous Optimization
+
+### Your First LON
 
 Let's create a Local Optima Network for the classic Rastrigin function:
 
@@ -31,7 +33,7 @@ print(f"Local optima found: {lon.n_vertices}")
 print(f"Transitions recorded: {lon.n_edges}")
 ```
 
-## Analyzing the Landscape
+### Analyzing the Landscape
 
 lonpy computes useful metrics about your fitness landscape:
 
@@ -45,6 +47,52 @@ print(f"Global funnels: {metrics['n_global_funnels']}")
 print(f"Neutrality: {metrics['neutral']:.1%}")
 print(f"Strength to global: {metrics['strength']:.1%}")
 ```
+
+## Discrete Optimization
+
+### Built-in Problems
+
+lonpy provides several built-in discrete optimization problems:
+
+```python
+from lonpy import compute_discrete_lon, OneMax, Knapsack, NumberPartitioning
+
+# OneMax: maximize the number of 1s in a bitstring
+problem = OneMax(n=20)
+lon = compute_discrete_lon(problem, n_runs=100, seed=42)
+
+print(f"Local optima found: {lon.n_vertices}")
+print(f"Transitions recorded: {lon.n_edges}")
+```
+
+### Knapsack Problem
+
+```python
+# 0/1 Knapsack: maximize value within capacity
+knapsack = Knapsack(
+    values=[60, 100, 120, 80, 90],
+    weights=[10, 20, 30, 15, 25],
+    capacity=50
+)
+lon = compute_discrete_lon(knapsack, n_runs=100, seed=42)
+
+metrics = lon.compute_metrics()
+print(f"Number of optima: {metrics['n_optima']}")
+print(f"Number of funnels: {metrics['n_funnels']}")
+```
+
+### Number Partitioning
+
+```python
+# Number Partitioning: minimize partition imbalance
+npp = NumberPartitioning(n=15, k=0.5, seed=42)
+lon = compute_discrete_lon(npp, n_runs=100, seed=42)
+
+metrics = lon.compute_metrics()
+print(f"Number of optima: {metrics['n_optima']}")
+```
+
+## Understanding Metrics
 
 **What do these metrics mean?**
 
@@ -118,9 +166,9 @@ In CMLON visualizations:
 - **Pink nodes**: In global funnel
 - **Light blue nodes**: In local funnels
 
-## Complete Example
+## Complete Examples
 
-Here's a full script that generates all visualizations:
+### Continuous Optimization
 
 ```python
 import numpy as np
@@ -163,8 +211,37 @@ for name, path in outputs.items():
     print(f"{name}: {path}")
 ```
 
+### Discrete Optimization
+
+```python
+from lonpy import compute_discrete_lon, OneMax, LONVisualizer
+
+# Build LON for OneMax
+problem = OneMax(n=20)
+lon = compute_discrete_lon(
+    problem,
+    n_runs=100,
+    non_improvement_iterations=100,
+    seed=42
+)
+
+# Print analysis
+print("=== LON Analysis ===")
+print(f"Vertices: {lon.n_vertices}")
+print(f"Edges: {lon.n_edges}")
+
+metrics = lon.compute_metrics()
+for key, value in metrics.items():
+    print(f"{key}: {value}")
+
+# Convert to CMLON
+cmlon = lon.to_cmlon()
+cmlon_metrics = cmlon.compute_metrics()
+print(f"\nGlobal funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
+```
+
 ## Next Steps
 
 - [Core Concepts](concepts.md) - Understand LON theory
-- [Sampling Guide](../user-guide/sampling.md) - Configure Basin-Hopping
+- [Sampling Guide](../user-guide/sampling.md) - Configure sampling algorithms
 - [API Reference](../api/index.md) - Full API documentation

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-from lonpy.lon import CMLON, LON
+from lonpy.lon import CMLON, LON, MLON
 
 COLORS = {
     "global_optimum": "red",
@@ -16,6 +16,10 @@ COLORS = {
     "edge": "dimgray",
     "lon_global": "red",
     "lon_local": "pink",
+    # Edge type colors (R-style)
+    "edge_improving": "gray50",
+    "edge_equal": "royalblue",
+    "edge_worsening": "forestgreen",
 }
 
 BACKGROUND_COLOR = "rgba(255,255,255,255)"
@@ -31,13 +35,17 @@ class LONVisualizer:
     """
     Visualizer for Local Optima Networks.
 
-    Produces 2D and 3D visualizations of LON and CMLON graphs,
+    Produces 2D and 3D visualizations of LON, MLON, and CMLON graphs,
     including static images and animated GIFs.
 
     Example:
         >>> viz = LONVisualizer()
         >>> viz.plot_2d(lon, output_path="lon.png")
         >>> viz.plot_3d(cmlon, output_path="cmlon_3d.png")
+
+        # With edge coloring by type
+        >>> viz = LONVisualizer(edge_color_by_type=True)
+        >>> viz.plot_2d(lon, output_path="lon_colored.png")
     """
 
     def __init__(
@@ -48,6 +56,10 @@ class LONVisualizer:
         max_node_size: float = 8.0,
         arrow_size: float = 0.2,
         alpha: int = 255,
+        edge_color_by_type: bool = False,
+        improving_color: str = COLORS["edge_improving"],
+        equal_color: str = COLORS["edge_equal"],
+        worsening_color: str = COLORS["edge_worsening"],
     ):
         """
         Initialize visualizer.
@@ -59,6 +71,10 @@ class LONVisualizer:
             max_node_size: Maximum node size.
             arrow_size: Arrow size for directed edges.
             alpha: Alpha value for colors (0-255).
+            edge_color_by_type: If True, color edges by type (improving/equal/worsening).
+            improving_color: Color for improving edges (fitness decreases).
+            equal_color: Color for equal fitness edges (neutral).
+            worsening_color: Color for worsening edges (fitness increases).
         """
         self.min_edge_width = min_edge_width
         self.max_edge_width = max_edge_width
@@ -66,6 +82,10 @@ class LONVisualizer:
         self.max_node_size = max_node_size
         self.arrow_size = arrow_size
         self.alpha = alpha
+        self.edge_color_by_type = edge_color_by_type
+        self.improving_color = improving_color
+        self.equal_color = equal_color
+        self.worsening_color = worsening_color
 
     def compute_edge_widths(self, graph) -> list[float]:
         """Compute edge widths based on edge weight (Count attribute)."""
@@ -101,8 +121,53 @@ class LONVisualizer:
 
         return sizes
 
-    def compute_lon_colors(self, lon: LON) -> list[str]:
-        """Compute node colors for LON visualization."""
+    def compute_edge_colors(self, lon_or_cmlon: LON | MLON | CMLON) -> list[str]:
+        """
+        Compute edge colors based on edge type or default.
+
+        If edge_color_by_type is True and edges have 'edge_type' attribute,
+        colors edges by type. Otherwise uses default edge color.
+
+        Args:
+            lon_or_cmlon: LON, MLON, or CMLON instance.
+
+        Returns:
+            List of color strings for each edge.
+        """
+        graph = lon_or_cmlon.graph
+
+        if graph.ecount() == 0:
+            return []
+
+        # If coloring by type is disabled, use default
+        if not self.edge_color_by_type:
+            return [COLORS["edge"]] * graph.ecount()
+
+        # Ensure edges are classified for LON
+        if isinstance(lon_or_cmlon, LON) and "edge_type" not in graph.es.attributes():
+            lon_or_cmlon.classify_edges()
+
+        # Check if edge_type attribute exists
+        if "edge_type" not in graph.es.attributes():
+            return [COLORS["edge"]] * graph.ecount()
+
+        # Color by edge type
+        colors = []
+        for edge in graph.es:
+            edge_type = edge["edge_type"]
+            if edge_type == "improving":
+                colors.append(self.improving_color)
+            elif edge_type == "equal":
+                colors.append(self.equal_color)
+            elif edge_type == "worsening":
+                colors.append(self.worsening_color)
+            else:
+                colors.append(COLORS["edge"])
+
+        return colors
+
+    def compute_lon_colors(self, lon: LON | MLON) -> list[str]:
+        """Compute node colors for LON or MLON visualization."""
         colors = []
         fits = lon.vertex_fitness
         best = lon.best_fitness
@@ -152,17 +217,17 @@ class LONVisualizer:
 
     def plot_2d(
         self,
-        lon_or_cmlon: LON | CMLON,
+        lon_or_cmlon: LON | MLON | CMLON,
         output_path: str | Path | None = None,
         figsize: tuple[int, int] = (8, 8),
         dpi: int = 100,
         seed: int | None = None,
     ) -> plt.Figure:
         """
-        Create 2D plot of LON or CMLON.
+        Create 2D plot of LON, MLON, or CMLON.
 
         Args:
-            lon_or_cmlon: LON or CMLON instance.
+            lon_or_cmlon: LON, MLON, or CMLON instance.
             output_path: Path to save PNG (optional).
             figsize: Figure size in inches.
             dpi: DPI for output.
@@ -175,6 +240,7 @@ class LONVisualizer:
 
         edge_widths = self.compute_edge_widths(graph)
         node_sizes = self.compute_node_sizes(graph)
+        edge_colors = self.compute_edge_colors(lon_or_cmlon)
 
         node_colors = (
             self.compute_cmlon_colors(lon_or_cmlon)
@@ -197,6 +263,9 @@ class LONVisualizer:
                 x0, y0 = layout[src_idx]
                 x1, y1 = layout[tgt_idx]
 
+                # Get edge color
+                edge_color = edge_colors[i] if edge_colors else COLORS["edge"]
+
                 # Draw arrow
                 ax.annotate(
                     "",
@@ -204,7 +273,7 @@ class LONVisualizer:
                     xytext=(x0, y0),
                     arrowprops=dict(
                         arrowstyle=f"->,head_length={self.arrow_size},head_width={self.arrow_size}",
-                        color=COLORS["edge"],
+                        color=edge_color,
                         lw=edge_widths[i],
                         shrinkA=node_sizes[src_idx] * 2,
                         shrinkB=node_sizes[tgt_idx] * 2,
@@ -233,7 +302,7 @@ class LONVisualizer:
 
     def plot_3d(
         self,
-        lon_or_cmlon: LON | CMLON,
+        lon_or_cmlon: LON | MLON | CMLON,
         output_path: str | Path | None = None,
         width: int = 800,
         height: int = 800,
@@ -243,7 +312,7 @@ class LONVisualizer:
         Create 3D plot with fitness as Z-axis.
 
         Args:
-            lon_or_cmlon: LON or CMLON instance.
+            lon_or_cmlon: LON, MLON, or CMLON instance.
             output_path: Path to save PNG (optional).
             width: Image width in pixels.
             height: Image height in pixels.
@@ -256,6 +325,7 @@ class LONVisualizer:
 
         edge_widths = self.compute_edge_widths(graph)
         node_sizes = self.compute_node_sizes(graph)
+        edge_colors = self.compute_edge_colors(lon_or_cmlon)
 
         node_colors = (
             self.compute_cmlon_colors(lon_or_cmlon)
@@ -279,6 +349,9 @@ class LONVisualizer:
                 src_idx = edge.source
                 tgt_idx = edge.target
 
+                # Get edge color
+                edge_color = edge_colors[i] if edge_colors else COLORS["edge"]
+
                 fig.add_trace(
                     go.Scatter3d(
                         x=[x[src_idx], x[tgt_idx]],
@@ -286,7 +359,7 @@ class LONVisualizer:
                         z=[z[src_idx], z[tgt_idx]],
                         mode="lines",
                         line=dict(
-                            color=COLORS["edge"],
+                            color=edge_color,
                             width=edge_widths[i] * 2,
                         ),
                         hoverinfo="none",
@@ -351,7 +424,7 @@ class LONVisualizer:
 
     def create_rotation_gif(
         self,
-        lon_or_cmlon: LON | CMLON,
+        lon_or_cmlon: LON | MLON | CMLON,
         output_path: str | Path,
         duration: float = 3.0,
         fps: int = 10,
@@ -365,7 +438,7 @@ class LONVisualizer:
         Create rotating GIF animation of 3D plot.
 
         Args:
-            lon_or_cmlon: LON or CMLON instance.
+            lon_or_cmlon: LON, MLON, or CMLON instance.
             output_path: Path to save GIF.
             duration: Animation duration in seconds.
             fps: Frames per second.
@@ -380,6 +453,7 @@ class LONVisualizer:
 
         edge_widths = self.compute_edge_widths(graph)
         node_sizes = self.compute_node_sizes(graph)
+        edge_colors = self.compute_edge_colors(lon_or_cmlon)
 
         node_colors = (
             self.compute_cmlon_colors(lon_or_cmlon)
@@ -409,13 +483,16 @@ class LONVisualizer:
                         src_idx = edge.source
                         tgt_idx = edge.target
 
+                        # Get edge color
+                        edge_color = edge_colors[j] if edge_colors else COLORS["edge"]
+
                         fig.add_trace(
                             go.Scatter3d(
                                 x=[x[src_idx], x[tgt_idx]],
                                 y=[y[src_idx], y[tgt_idx]],
                                 z=[z[src_idx], z[tgt_idx]],
                                 mode="lines",
-                                line=dict(color=COLORS["edge"], width=edge_widths[j] * 2),
+                                line=dict(color=edge_color, width=edge_widths[j] * 2),
                                 hoverinfo="none",
                                 showlegend=False,
                             )

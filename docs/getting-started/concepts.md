@@ -18,9 +18,17 @@ Think of it as a terrain where:
 
 ## Local Optima
 
-A **local optimum** is a solution that cannot be improved by small changes. In continuous optimization, this means:
+A **local optimum** is a solution that cannot be improved by small changes.
+
+### In Continuous Optimization
+
+For continuous problems, this means:
 
 $$\nabla f(x^*) = 0 \quad \text{and} \quad \nabla^2 f(x^*) \succeq 0$$
+
+### In Discrete Optimization
+
+For discrete problems (like bitstrings), a local optimum means no single-bit flip (or swap, for permutations) improves the fitness.
 
 Local optima are important because:
 
@@ -28,7 +36,11 @@ Local optima are important because:
 - **Multimodal functions** have many local optima
 - The **global optimum** is the best local optimum
 
-## Basin-Hopping
+## Sampling Algorithms
+
+lonpy uses different sampling algorithms for continuous and discrete problems.
+
+### Basin-Hopping (Continuous)
 
 **Basin-Hopping** is a global optimization algorithm that escapes local optima through:
 
@@ -44,6 +56,32 @@ Local Opt A → (perturb) → Local Opt B → (perturb) → Local Opt C → ...
 
 lonpy records these transitions to build the LON.
 
+### Iterated Local Search (Discrete)
+
+**Iterated Local Search (ILS)** is the discrete counterpart of Basin-Hopping:
+
+1. **Hill climbing**: Find nearest local optimum using neighborhood moves
+2. **Perturbation**: Apply multiple random moves to escape the current basin
+3. **Acceptance**: Move to new optimum if it's better or equal
+
+```
+Local Opt A → (perturb) → Local Opt B → (perturb) → Local Opt C → ...
+```
+
+#### Neighborhoods
+
+For discrete problems, the neighborhood defines which solutions are "neighbors":
+
+- **Flip neighborhood** (bitstrings): Change one bit from 0→1 or 1→0
+- **Swap neighborhood** (permutations): Exchange positions of two elements
+
+#### Hill Climbing
+
+Hill climbing iteratively moves to better neighbors:
+
+- **First improvement**: Accept the first improving neighbor found
+- **Best improvement**: Evaluate all neighbors, move to the best one
+
 ## Local Optima Networks
 
 A **Local Optima Network (LON)** is a directed graph where:
@@ -56,7 +94,7 @@ A **Local Optima Network (LON)** is a directed graph where:
 
 lonpy constructs LONs by:
 
-1. Running multiple Basin-Hopping searches
+1. Running multiple sampling searches (Basin-Hopping or ILS)
 2. Recording every transition (source optimum → target optimum)
 3. Aggregating transitions into a weighted graph
 
@@ -67,6 +105,8 @@ lonpy constructs LONs by:
 
 ### Node Identification
 
+#### Continuous Problems
+
 Two solutions are considered the same local optimum if their coordinates match after rounding to `hash_digits` decimal places:
 
 ```python
@@ -74,6 +114,15 @@ Two solutions are considered the same local optimum if their coordinates match a
 # x1 = [1.23456, 2.34567] → "1.2346_2.3457"
 # x2 = [1.23458, 2.34569] → "1.2346_2.3457"
 # Same node!
+```
+
+#### Discrete Problems
+
+For discrete problems, solutions are hashed based on their representation:
+
+```python
+# Bitstring [1, 0, 1, 1, 0] → hash based on bit pattern
+# Permutation [3, 1, 4, 2, 0] → hash based on element order
 ```
 
 ## LON Metrics
@@ -150,8 +199,43 @@ Funnels are identified as **weakly connected components** in the CMLON when cons
 
 The ideal landscape has a single global funnel. Multiple funnels indicate potential difficulty for optimization algorithms.
 
+## Built-in Problems
+
+lonpy provides several discrete optimization problems:
+
+### OneMax
+
+Maximize the number of 1s in a bitstring. Simple unimodal landscape.
+
+```python
+from lonpy import OneMax
+problem = OneMax(n=20)  # 20-bit bitstring
+```
+
+### Knapsack
+
+Select items to maximize value without exceeding capacity. NP-hard with complex landscape.
+
+```python
+from lonpy import Knapsack
+problem = Knapsack(
+    values=[60, 100, 120],
+    weights=[10, 20, 30],
+    capacity=50
+)
+```
+
+### Number Partitioning
+
+Partition numbers into two sets with minimal difference. NP-hard.
+
+```python
+from lonpy import NumberPartitioning
+problem = NumberPartitioning(n=20, k=0.5, seed=42)
+```
+
 ## Further Reading
 
-- [Sampling Guide](../user-guide/sampling.md) - Configure Basin-Hopping for your problem
+- [Sampling Guide](../user-guide/sampling.md) - Configure sampling for your problem
 - [Analysis Guide](../user-guide/analysis.md) - Interpret LON metrics
 - [Visualization Guide](../user-guide/visualization.md) - Create plots of your LON

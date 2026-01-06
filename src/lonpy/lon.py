@@ -167,6 +167,48 @@ class LON:
             "strength": strength,
         }
 
+    def classify_edges(self) -> None:
+        """
+        Classify edges as 'improving', 'equal', or 'worsening'.
+
+        Adds 'edge_type' attribute to each edge based on fitness comparison:
+        - 'improving': target has better (lower) fitness than source
+        - 'equal': source and target have same fitness
+        - 'worsening': target has worse (higher) fitness than source
+
+        This classification is used for MLON construction and visualization.
+        """
+        if self.n_edges == 0:
+            return
+
+        fits = self.vertex_fitness
+        edge_types = []
+
+        for edge in self.graph.es:
+            src_fit = fits[edge.source]
+            tgt_fit = fits[edge.target]
+
+            if tgt_fit < src_fit:
+                edge_types.append("improving")
+            elif tgt_fit > src_fit:
+                edge_types.append("worsening")
+            else:
+                edge_types.append("equal")
+
+        self.graph.es["edge_type"] = edge_types
+
+    def to_mlon(self) -> "MLON":
+        """
+        Convert LON to Monotonic LON (MLON).
+
+        MLON keeps only non-worsening edges (improving and equal).
+        All vertices are preserved even if they become disconnected.
+
+        Returns:
+            MLON instance with only monotonic edges.
+        """
+        return MLON.from_lon(self)
+
     def to_cmlon(self) -> "CMLON":
         """
         Convert LON to Compressed Monotonic LON (CMLON).
@@ -175,6 +217,95 @@ class LON:
             CMLON instance with contracted neutral nodes.
         """
         return CMLON.from_lon(self)
+
+
+@dataclass
+class MLON:
+    """
+    Monotonic Local Optima Network (MLON).
+
+    MLON is a variant of LON that keeps only non-worsening edges
+    (improving and equal fitness transitions). This focuses on
+    the "downhill" structure of the landscape.
+
+    Attributes:
+        graph: The underlying igraph Graph object.
+        best_fitness: The best (minimum) fitness value.
+        source_lon: Reference to the original LON.
+    """
+
+    graph: ig.Graph = field(default_factory=lambda: ig.Graph(directed=True))
+    best_fitness: float | None = None
+    source_lon: LON | None = None
+
+    @classmethod
+    def from_lon(cls, lon: LON) -> "MLON":
+        """
+        Create MLON from LON by removing worsening edges.
+
+        Args:
+            lon: Source LON instance.
+
+        Returns:
+            MLON with only improving and equal edges.
+        """
+        if lon.n_edges == 0:
+            mlon_graph = lon.graph.copy()
+            return cls(graph=mlon_graph, best_fitness=lon.best_fitness, source_lon=lon)
+
+        # Ensure edges are classified
+        if "edge_type" not in lon.graph.es.attributes():
+            lon.classify_edges()
+
+        # Keep only non-worsening edges
+        non_worsening_indices = [
+            i for i, e in enumerate(lon.graph.es) if e["edge_type"] != "worsening"
+        ]
+
+        # Create subgraph keeping all vertices
+        mlon_graph = lon.graph.subgraph_edges(non_worsening_indices, delete_vertices=False)
+        mlon_graph = mlon_graph.simplify(multiple=False, loops=True)
+
+        return cls(graph=mlon_graph, best_fitness=lon.best_fitness, source_lon=lon)
+
+    @property
+    def n_vertices(self) -> int:
+        """Number of vertices in MLON."""
+        return int(self.graph.vcount())
+
+    @property
+    def n_edges(self) -> int:
+        """Number of edges in MLON."""
+        return int(self.graph.ecount())
+
+    @property
+    def vertex_fitness(self) -> list[float]:
+        """List of vertex fitness values."""
+        return list(self.graph.vs["Fitness"])
+
+    def get_sinks(self) -> list[int]:
+        """Get indices of sink nodes (nodes with no outgoing edges)."""
+        out_degrees = self.graph.degree(mode="out")
+        return [i for i, d in enumerate(out_degrees) if d == 0]
+
+    def get_global_optima_indices(self) -> list[int]:
+        """Get indices of global optima nodes."""
+        return [i for i, f in enumerate(self.vertex_fitness) if f == self.best_fitness]
+
+    def to_cmlon(self) -> "CMLON":
+        """
+        Convert MLON to Compressed Monotonic LON (CMLON).
+
+        Returns:
+            CMLON instance with contracted neutral nodes.
+        """
+        # Use the source LON if available for proper CMLON construction
+        if self.source_lon is not None:
+            return CMLON.from_lon(self.source_lon)
+
+        # Otherwise create a temporary LON-like structure
+        temp_lon = LON(graph=self.graph.copy(), best_fitness=self.best_fitness)
+        return CMLON.from_lon(temp_lon)
 
 
 @dataclass

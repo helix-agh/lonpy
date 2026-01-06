@@ -2,6 +2,11 @@ paper_results/
 .venv/
 .ruff_cache/
 .mypy_cache/
+.pytest_cache/
+htmlcov/
 paper_reproduction.py
+bbob_visualizations/
 site/
+.coverage
 CLAUDE.md
+examples/

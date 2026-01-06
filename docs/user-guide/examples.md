@@ -2,7 +2,9 @@
 
 Complete examples demonstrating lonpy's capabilities.
 
-## Basic LON Analysis
+## Continuous Optimization
+
+### Basic LON Analysis
 
 ```python
 import numpy as np
@@ -43,7 +45,7 @@ viz.plot_2d(lon, output_path="rastrigin_lon.png", seed=42)
 viz.plot_3d(lon, output_path="rastrigin_3d.png", seed=42)
 ```
 
-## Comparing Multiple Functions
+### Comparing Multiple Functions
 
 ```python
 import numpy as np
@@ -108,51 +110,7 @@ print("\n=== Comparison ===")
 print(df.to_string(index=False))
 ```
 
-## Detailed CMLON Analysis
-
-```python
-import numpy as np
-from lonpy import compute_lon, LONVisualizer
-
-def rastrigin(x):
-    return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
-
-# Build LON
-lon = compute_lon(
-    rastrigin,
-    dim=2,
-    lower_bound=-5.12,
-    upper_bound=5.12,
-    n_runs=50,
-    seed=42
-)
-
-# Convert to CMLON
-cmlon = lon.to_cmlon()
-
-print("=== LON vs CMLON ===")
-print(f"LON vertices:   {lon.n_vertices}")
-print(f"CMLON vertices: {cmlon.n_vertices}")
-print(f"Compression:    {1 - cmlon.n_vertices/lon.n_vertices:.1%}")
-
-print("\n=== CMLON Structure ===")
-print(f"Total sinks:  {len(cmlon.get_sinks())}")
-print(f"Global sinks: {len(cmlon.get_global_sinks())}")
-print(f"Local sinks:  {len(cmlon.get_local_sinks())}")
-
-# Metrics
-cmlon_metrics = cmlon.compute_metrics()
-print("\n=== CMLON Metrics ===")
-print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
-print(f"Strength to global: {cmlon_metrics['strength']:.1%}")
-
-# Visualize
-viz = LONVisualizer()
-viz.plot_2d(cmlon, output_path="cmlon_2d.png", seed=42)
-viz.plot_3d(cmlon, output_path="cmlon_3d.png", seed=42)
-```
-
-## Custom Sampling Configuration
+### Custom Sampling Configuration
 
 ```python
 import numpy as np
@@ -199,41 +157,248 @@ print(f"Funnels: {metrics['n_funnels']}")
 print(f"Strength: {metrics['strength']:.1%}")
 ```
 
-## Accessing Raw Trace Data
+## Discrete Optimization
+
+### OneMax Analysis
+
+```python
+from lonpy import compute_discrete_lon, OneMax, LONVisualizer
+
+# Build LON for OneMax
+problem = OneMax(n=20)
+lon = compute_discrete_lon(
+    problem,
+    n_runs=100,
+    non_improvement_iterations=100,
+    seed=42
+)
+
+# Analyze
+print("=== OneMax LON Analysis ===")
+print(f"Local optima: {lon.n_vertices}")
+print(f"Transitions: {lon.n_edges}")
+print(f"Best fitness: {lon.best_fitness}")
+
+metrics = lon.compute_metrics()
+for key, value in metrics.items():
+    if isinstance(value, float):
+        print(f"{key}: {value:.4f}")
+    else:
+        print(f"{key}: {value}")
+
+# Convert to CMLON
+cmlon = lon.to_cmlon()
+cmlon_metrics = cmlon.compute_metrics()
+print(f"\nCMLON vertices: {cmlon.n_vertices}")
+print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
+```
+
+### Knapsack Problem
+
+```python
+from lonpy import compute_discrete_lon, Knapsack, LONVisualizer
+
+# Define a Knapsack instance
+problem = Knapsack(
+    values=[60, 100, 120, 80, 90, 70, 110, 95, 85, 75],
+    weights=[10, 20, 30, 15, 25, 12, 28, 22, 18, 14],
+    capacity=80
+)
+
+# Build LON
+lon = compute_discrete_lon(
+    problem,
+    n_runs=200,
+    non_improvement_iterations=150,
+    perturbation_strength=2,
+    seed=42
+)
+
+# Analyze
+print("=== Knapsack LON Analysis ===")
+print(f"Number of items: {problem.n}")
+print(f"Local optima: {lon.n_vertices}")
+print(f"Transitions: {lon.n_edges}")
+print(f"Best fitness: {lon.best_fitness}")
+
+metrics = lon.compute_metrics()
+print(f"\nFunnels: {metrics['n_funnels']}")
+print(f"Global funnels: {metrics['n_global_funnels']}")
+print(f"Strength: {metrics['strength']:.1%}")
+
+# CMLON analysis
+cmlon = lon.to_cmlon()
+cmlon_metrics = cmlon.compute_metrics()
+print(f"\nCMLON vertices: {cmlon.n_vertices}")
+print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
+```
+
+### Number Partitioning
+
+```python
+from lonpy import compute_discrete_lon, NumberPartitioning
+
+# Generate NPP instance
+problem = NumberPartitioning(n=20, k=0.5, seed=42)
+
+print(f"NPP instance with {problem.n} items")
+print(f"Item values: {problem.items[:5]}... (first 5)")
+
+# Build LON
+lon = compute_discrete_lon(
+    problem,
+    n_runs=150,
+    non_improvement_iterations=100,
+    perturbation_strength=2,
+    seed=42
+)
+
+# Analyze
+print("\n=== NPP LON Analysis ===")
+print(f"Local optima: {lon.n_vertices}")
+print(f"Best fitness: {lon.best_fitness}")  # 0 = perfect partition
+
+metrics = lon.compute_metrics()
+print(f"Funnels: {metrics['n_funnels']}")
+print(f"Neutrality: {metrics['neutral']:.1%}")
+
+# Check if perfect partition exists
+if lon.best_fitness == 0:
+    print("\nPerfect partition found!")
+else:
+    print(f"\nBest partition difference: {lon.best_fitness}")
+```
+
+### Comparing Discrete Problems
+
+```python
+import pandas as pd
+from lonpy import compute_discrete_lon, OneMax, Knapsack, NumberPartitioning
+
+# Define problems
+problems = {
+    "OneMax-20": OneMax(n=20),
+    "OneMax-30": OneMax(n=30),
+    "Knapsack-10": Knapsack(
+        values=[60, 100, 120, 80, 90, 70, 110, 95, 85, 75],
+        weights=[10, 20, 30, 15, 25, 12, 28, 22, 18, 14],
+        capacity=80
+    ),
+    "NPP-15": NumberPartitioning(n=15, k=0.5, seed=42),
+    "NPP-20": NumberPartitioning(n=20, k=0.5, seed=42),
+}
+
+# Analyze each
+results = []
+for name, problem in problems.items():
+    print(f"Analyzing {name}...")
+
+    lon = compute_discrete_lon(
+        problem,
+        n_runs=100,
+        non_improvement_iterations=100,
+        seed=42
+    )
+
+    metrics = lon.compute_metrics()
+    cmlon = lon.to_cmlon()
+    cmlon_metrics = cmlon.compute_metrics()
+
+    results.append({
+        "Problem": name,
+        "n": problem.n,
+        "Optima": lon.n_vertices,
+        "Funnels": metrics['n_funnels'],
+        "Neutrality": f"{metrics['neutral']:.1%}",
+        "Global Funnel %": f"{cmlon_metrics['global_funnel_proportion']:.1%}",
+    })
+
+# Display results
+df = pd.DataFrame(results)
+print("\n=== Comparison ===")
+print(df.to_string(index=False))
+```
+
+### Custom ILS Configuration
+
+```python
+from lonpy import ILSSampler, ILSSamplerConfig, OneMax
+
+# Custom configuration
+config = ILSSamplerConfig(
+    n_runs=200,
+    max_iterations=0,               # No limit
+    non_improvement_iterations=150, # Stop condition
+    perturbation_strength=3,        # Larger perturbation
+    first_improvement=True,         # Faster exploration
+    representation="bitstring",
+    neighborhood="flip",
+    seed=42
+)
+
+sampler = ILSSampler(config)
+problem = OneMax(n=30)
+
+def progress(run, total):
+    if run % 20 == 0:
+        print(f"Progress: {run}/{total}")
+
+lon = sampler.sample_to_lon(problem, progress_callback=progress)
+
+print(f"\nFound {lon.n_vertices} local optima")
+metrics = lon.compute_metrics()
+print(f"Funnels: {metrics['n_funnels']}")
+```
+
+## CMLON Analysis
+
+### Detailed CMLON Comparison
 
 ```python
 import numpy as np
-import pandas as pd
-from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
+from lonpy import compute_lon, LONVisualizer
 
-def sphere(x):
-    return np.sum(x**2)
+def rastrigin(x):
+    return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
-config = BasinHoppingSamplerConfig(n_runs=5, n_iterations=100, seed=42)
-sampler = BasinHoppingSampler(config)
+# Build LON
+lon = compute_lon(
+    rastrigin,
+    dim=2,
+    lower_bound=-5.12,
+    upper_bound=5.12,
+    n_runs=50,
+    seed=42
+)
 
-domain = [(-5.0, 5.0), (-5.0, 5.0)]
-trace_df, raw_records = sampler.sample(sphere, domain)
+# Convert to CMLON
+cmlon = lon.to_cmlon()
 
-# Trace data for LON construction
-print("=== Trace Data ===")
-print(trace_df.head(10))
-print(f"\nTotal transitions: {len(trace_df)}")
+print("=== LON vs CMLON ===")
+print(f"LON vertices:   {lon.n_vertices}")
+print(f"CMLON vertices: {cmlon.n_vertices}")
+print(f"Compression:    {1 - cmlon.n_vertices/lon.n_vertices:.1%}")
 
-# Raw iteration data
-print("\n=== Sample Raw Records ===")
-for i, rec in enumerate(raw_records[:5]):
-    print(f"Run {rec['run']}, Iter {rec['iteration']}:")
-    print(f"  From: {rec['current_f']:.6f} -> To: {rec['new_f']:.6f}")
-    print(f"  Accepted: {rec['accepted']}")
+print("\n=== CMLON Structure ===")
+print(f"Total sinks:  {len(cmlon.get_sinks())}")
+print(f"Global sinks: {len(cmlon.get_global_sinks())}")
+print(f"Local sinks:  {len(cmlon.get_local_sinks())}")
 
-# Analyze acceptance rate
-accepted = sum(r['accepted'] for r in raw_records)
-total = len(raw_records)
-print(f"\nAcceptance rate: {accepted/total:.1%}")
+# Metrics
+cmlon_metrics = cmlon.compute_metrics()
+print("\n=== CMLON Metrics ===")
+print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
+print(f"Strength to global: {cmlon_metrics['strength']:.1%}")
+
+# Visualize
+viz = LONVisualizer()
+viz.plot_2d(cmlon, output_path="cmlon_2d.png", seed=42)
+viz.plot_3d(cmlon, output_path="cmlon_3d.png", seed=42)
 ```
 
-## Working with the Graph Directly
+## Working with the Graph
+
+### Accessing Graph Properties
 
 ```python
 import numpy as np
@@ -270,7 +435,9 @@ if g.ecount() > 0:
     print(f"Mean edge weight: {np.mean(edge_weights):.2f}")
 ```
 
-## Batch Analysis Script
+## Batch Analysis
+
+### Analyzing Multiple Instances
 
 ```python
 import numpy as np

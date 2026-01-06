@@ -6,13 +6,15 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1Ujl48ffgHg9ck1Hueh59s65OR3Q3BG99?usp=sharing)
 
-**Local Optima Networks for Continuous Optimization**
+**Local Optima Networks**
 
-lonpy is a Python library for constructing, analyzing, and visualizing Local Optima Networks (LONs) for continuous optimization problems. LONs provide a powerful way to understand the structure of fitness landscapes, revealing how local optima are connected and how difficult it may be to find global optima.
+lonpy is a Python library for constructing, analyzing, and visualizing Local Optima Networks (LONs) for both continuous and discrete optimization problems. LONs provide a powerful way to understand the structure of fitness landscapes, revealing how local optima are connected and how difficult it may be to find global optima.
 
 ## Features
 
-- **Basin-Hopping Sampling**: Efficient exploration of fitness landscapes using configurable Basin-Hopping
+- **Continuous Optimization**: Basin-Hopping sampling for continuous fitness landscapes
+- **Discrete Optimization**: Iterated Local Search (ILS) sampling for combinatorial problems
+- **Built-in Problems**: OneMax, Knapsack, Number Partitioning, and custom problem support
 - **LON Construction**: Automatic construction of Local Optima Networks from sampling data
 - **CMLON Support**: Compressed Monotonic LONs for cleaner landscape analysis
 - **Rich Metrics**: Compute landscape metrics including funnel analysis and neutrality
@@ -34,6 +36,8 @@ pip install -e .
 
 ## Quick Start
 
+### Continuous Optimization
+
 ```python
 import numpy as np
 from lonpy import compute_lon, LONVisualizer
@@ -54,6 +58,7 @@ lon = compute_lon(
 )
 
 metrics = lon.compute_metrics()
+print(f"Number of optima: {metrics['n_optima']}")
 print(f"Number of funnels: {metrics['n_funnels']}")
 print(f"Global funnels: {metrics['n_global_funnels']}")
 
@@ -63,7 +68,33 @@ viz.plot_2d(lon, output_path="lon_2d.png")
 viz.plot_3d(lon, output_path="lon_3d.png")
 ```
 
-### Compressed Monotonic LONs (CMLONs)
+### Discrete Optimization
+
+```python
+from lonpy import compute_discrete_lon, OneMax, Knapsack, NumberPartitioning
+
+# OneMax problem (maximize number of 1s in a bitstring)
+problem = OneMax(n=20)
+lon = compute_discrete_lon(problem, n_runs=100, seed=42)
+
+metrics = lon.compute_metrics()
+print(f"Number of optima: {metrics['n_optima']}")
+print(f"Number of funnels: {metrics['n_funnels']}")
+
+# Knapsack problem
+knapsack = Knapsack(
+    values=[60, 100, 120, 80, 90],
+    weights=[10, 20, 30, 15, 25],
+    capacity=50
+)
+lon = compute_discrete_lon(knapsack, n_runs=100, seed=42)
+
+# Number Partitioning problem
+npp = NumberPartitioning(n=15, k=0.5, seed=42)
+lon = compute_discrete_lon(npp, n_runs=100, seed=42)
+```
+
+## Compressed Monotonic LONs (CMLONs)
 
 CMLONs are a compressed representation where nodes with equal fitness that are connected get merged. This provides a cleaner view of the landscape's funnel structure.
 
@@ -73,9 +104,12 @@ cmlon = lon.to_cmlon()
 
 # Analyze CMLON-specific metrics
 cmlon_metrics = cmlon.compute_metrics()
+print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']}")
 ```
 
-### Custom Sampling Configuration
+## Advanced Configuration
+
+### Continuous Sampling (Basin-Hopping)
 
 ```python
 from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
@@ -84,7 +118,7 @@ config = BasinHoppingSamplerConfig(
     n_runs=50,              # Number of independent runs
     n_iterations=1000,      # Iterations per run
     step_size=0.05,         # Perturbation size
-    step_mode="per",        # "per" (percentage) or "fix" (fixed)
+    step_mode="percentage", # "percentage" (of domain) or "fixed"
     hash_digits=4,          # Precision for identifying optima
     seed=42                 # For reproducibility
 )
@@ -96,6 +130,24 @@ domain = [(-5.12, 5.12), (-5.12, 5.12)]
 
 # Run sampling
 lon = sampler.sample_to_lon(rastrigin, domain)
+```
+
+### Discrete Sampling (Iterated Local Search)
+
+```python
+from lonpy import ILSSampler, ILSSamplerConfig, OneMax
+
+config = ILSSamplerConfig(
+    n_runs=100,                     # Number of independent ILS runs
+    non_improvement_iterations=100, # Stop after no improvement
+    perturbation_strength=2,        # Number of random moves per perturbation
+    first_improvement=True,         # Use first improvement hill climbing
+    seed=42                         # For reproducibility
+)
+
+sampler = ILSSampler(config)
+problem = OneMax(n=20)
+lon = sampler.sample_to_lon(problem)
 ```
 
 ## Documentation

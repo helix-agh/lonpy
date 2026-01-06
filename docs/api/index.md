@@ -4,7 +4,7 @@ Complete API documentation for lonpy.
 
 ## Modules
 
-lonpy is organized into three main modules:
+lonpy is organized into modules for continuous and discrete optimization:
 
 ### [LON Module](lon.md)
 
@@ -15,11 +15,25 @@ Data structures for Local Optima Networks.
 
 ### [Sampling Module](sampling.md)
 
-Basin-Hopping sampling for LON construction.
+Sampling algorithms for LON construction.
 
-- [`compute_lon()`](sampling.md#lonpy.sampling.compute_lon) - High-level convenience function
-- [`BasinHoppingSampler`](sampling.md#lonpy.sampling.BasinHoppingSampler) - Sampling class
-- [`BasinHoppingSamplerConfig`](sampling.md#lonpy.sampling.BasinHoppingSamplerConfig) - Configuration
+**Continuous Optimization:**
+
+- [`compute_lon()`](sampling.md#lonpy.continuous.sampling.compute_lon) - High-level convenience function
+- [`BasinHoppingSampler`](sampling.md#lonpy.continuous.sampling.BasinHoppingSampler) - Basin-Hopping sampler
+- [`BasinHoppingSamplerConfig`](sampling.md#lonpy.continuous.sampling.BasinHoppingSamplerConfig) - Configuration
+
+**Discrete Optimization:**
+
+- [`compute_discrete_lon()`](sampling.md#lonpy.discrete.sampling.compute_discrete_lon) - High-level convenience function
+- [`ILSSampler`](sampling.md#lonpy.discrete.sampling.ILSSampler) - Iterated Local Search sampler
+- [`ILSSamplerConfig`](sampling.md#lonpy.discrete.sampling.ILSSamplerConfig) - Configuration
+
+**Built-in Problems:**
+
+- [`OneMax`](sampling.md#lonpy.problems.discrete.OneMax) - Maximize 1s in bitstring
+- [`Knapsack`](sampling.md#lonpy.problems.discrete.Knapsack) - 0/1 Knapsack problem
+- [`NumberPartitioning`](sampling.md#lonpy.problems.discrete.NumberPartitioning) - Number partitioning problem
 
 ### [Visualization Module](visualization.md)
 
@@ -29,12 +43,11 @@ Plotting and animation tools.
 
 ## Quick Reference
 
-### Creating a LON
+### Creating a LON (Continuous)
 
 ```python
 from lonpy import compute_lon
 
-# Simple usage
 lon = compute_lon(
     func=objective_function,
     dim=2,
@@ -43,6 +56,15 @@ lon = compute_lon(
     n_runs=20,
     seed=42
 )
+```
+
+### Creating a LON (Discrete)
+
+```python
+from lonpy import compute_discrete_lon, OneMax
+
+problem = OneMax(n=20)
+lon = compute_discrete_lon(problem, n_runs=100, seed=42)
 ```
 
 ### Analyzing a LON
@@ -86,7 +108,7 @@ viz.visualize_all(lon, output_folder="./output")
 lonpy depends on:
 
 - `numpy` - Numerical computations
-- `scipy` - Optimization
+- `scipy` - Optimization (continuous)
 - `pandas` - Data handling
 - `igraph` - Graph operations
 - `matplotlib` - 2D plotting
