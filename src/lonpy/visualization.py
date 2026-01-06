@@ -1,6 +1,8 @@
+import random
 import shutil
 from pathlib import Path
 
+import igraph as ig
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
@@ -147,6 +149,7 @@ class LONVisualizer:
         """Get 2D layout coordinates for graph nodes."""
         if seed is not None:
             np.random.seed(seed)
+            ig.set_random_number_generator(random.Random(seed))
         layout = graph.layout_auto()
         return np.array(layout.coords)
 
