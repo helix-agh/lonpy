@@ -27,6 +27,7 @@ dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "ruff>=0.8.0",
+    "ty>=0.0.10",
 ]
 
 [build-system]
@@ -37,40 +38,38 @@ build-backend = "hatchling.build"
 packages = ["src/lonpy"]
 
 [tool.ruff]
-line-length = 100
-target-version = "py310"
+line-length = 135
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
-    "F",   # Pyflakes
+    "F",   # pyflakes
     "I",   # isort
     "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-    "ARG", # flake8-unused-arguments
+    "C",   # flake8-comprehensions
+    "UP",  # pyupgrade (modern Python syntax)
     "SIM", # flake8-simplify
-    "TCH", # flake8-type-checking
-    "PTH", # flake8-use-pathlib
     "RUF", # Ruff-specific rules
+    "N",   # pep8-naming
+    "YTT", # flake8-2020
+    "A",   # flake8-builtins
 ]
-ignore = [
-    "E501",   # line too long (handled by formatter)
-    "B008",   # do not perform function calls in argument defaults
-    "B905",   # zip without strict parameter
-    "SIM108", # use ternary operator instead of if-else
-    "C408",   # unnecessary dict() call - often more readable in plotly
-]
+ignore = ["C408"]
+mccabe = {max-complexity = 15}
 
 [tool.ruff.lint.isort]
-known-first-party = ["lonpy"]
+known-first-party = ["project-name"] # replace with your project name
+combine-as-imports = true
 
-[tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG"]
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "lf"
+docstring-code-format = true
 
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-ignore_missing_imports = true
+[tool.ty.rules]
+unresolved-import = "ignore"
+possibly-missing-attribute = "ignore"

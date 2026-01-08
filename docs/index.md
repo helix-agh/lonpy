@@ -1,10 +1,10 @@
 # lonpy
 
-**Local Optima Networks for Continuous Optimization**
+**Local Optima Networks for Continuous and Discrete Optimization**
 
 ![lonpy](assets/icon.png){ width="100%" }
 
-lonpy is a Python library for constructing, analyzing, and visualizing Local Optima Networks (LONs) for continuous optimization problems.
+lonpy is a Python library for constructing, analyzing, and visualizing Local Optima Networks (LONs) for both continuous and discrete optimization problems.
 
 ## What are Local Optima Networks?
 
@@ -18,17 +18,29 @@ Local Optima Networks (LONs) are graph-based models that capture the global stru
 
 <div class="grid cards" markdown>
 
-- **Basin-Hopping Sampling**
+- **Continuous Optimization**
 
     ---
 
-    Efficient exploration of fitness landscapes using configurable Basin-Hopping with customizable perturbation strategies
+    Basin-Hopping sampling for continuous fitness landscapes with configurable perturbation strategies
 
-- **LON Construction**
+- **Discrete Optimization**
 
     ---
 
-    Automatic construction of Local Optima Networks from sampling data with support for both LON and CMLON representations
+    Iterated Local Search (ILS) sampling for combinatorial problems like OneMax, Knapsack, and Number Partitioning
+
+- **Built-in Problems**
+
+    ---
+
+    Ready-to-use problem instances: OneMax, Knapsack, Number Partitioning, and support for custom problems
+
+- **LON & CMLON Support**
+
+    ---
+
+    Both standard LON and Compressed Monotonic LON representations for landscape analysis
 
 - **Rich Metrics**
 
@@ -46,33 +58,58 @@ Local Optima Networks (LONs) are graph-based models that capture the global stru
 
 ## Quick Example
 
-```python
-import numpy as np
-from lonpy import compute_lon, LONVisualizer
+=== "Continuous"
 
-# Define the Rastrigin function
-def rastrigin(x):
-    return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
+    ```python
+    import numpy as np
+    from lonpy import compute_lon, LONVisualizer
 
-# Build the LON
-lon = compute_lon(
-    rastrigin,
-    dim=2,
-    lower_bound=-5.12,
-    upper_bound=5.12,
-    n_runs=20,
-    seed=42
-)
+    # Define the Rastrigin function
+    def rastrigin(x):
+        return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
-# Analyze
-metrics = lon.compute_metrics()
-print(f"Found {lon.n_vertices} local optima")
-print(f"Landscape has {metrics['n_funnels']} funnels")
+    # Build the LON
+    lon = compute_lon(
+        rastrigin,
+        dim=2,
+        lower_bound=-5.12,
+        upper_bound=5.12,
+        n_runs=20,
+        seed=42
+    )
 
-# Visualize
-viz = LONVisualizer()
-viz.plot_3d(lon, output_path="landscape.png")
-```
+    # Analyze
+    metrics = lon.compute_metrics()
+    print(f"Found {lon.n_vertices} local optima")
+    print(f"Landscape has {metrics['n_funnels']} funnels")
+
+    # Visualize
+    viz = LONVisualizer()
+    viz.plot_3d(lon, output_path="landscape.png")
+    ```
+
+=== "Discrete"
+
+    ```python
+    from lonpy import compute_discrete_lon, OneMax, Knapsack
+
+    # OneMax problem
+    problem = OneMax(n=20)
+    lon = compute_discrete_lon(problem, n_runs=100, seed=42)
+
+    # Analyze
+    metrics = lon.compute_metrics()
+    print(f"Found {lon.n_vertices} local optima")
+    print(f"Landscape has {metrics['n_funnels']} funnels")
+
+    # Knapsack problem
+    knapsack = Knapsack(
+        values=[60, 100, 120, 80, 90],
+        weights=[10, 20, 30, 15, 25],
+        capacity=50
+    )
+    lon = compute_discrete_lon(knapsack, n_runs=100, seed=42)
+    ```
 
 ## Installation
 

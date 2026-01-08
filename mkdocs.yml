@@ -1,6 +1,6 @@
 site_name: lonpy
-site_description: Local Optima Networks for Continuous Optimization
-site_author: Your Name
+site_description: Local Optima Networks
+site_author: AGH University of Kraków
 site_url: https://agh-a2s.github.io/lonpy
 
 repo_name: agh-a2s/lonpy
