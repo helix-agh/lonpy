@@ -258,9 +258,7 @@ class MLON:
             lon.classify_edges()
 
         # Keep only non-worsening edges
-        non_worsening_indices = [
-            i for i, e in enumerate(lon.graph.es) if e["edge_type"] != "worsening"
-        ]
+        non_worsening_indices = [i for i, e in enumerate(lon.graph.es) if e["edge_type"] != "worsening"]
 
         # Create subgraph keeping all vertices
         mlon_graph = lon.graph.subgraph_edges(non_worsening_indices, delete_vertices=False)
@@ -361,7 +359,7 @@ class CMLON:
         # Mark edge types and find equal-fitness edges
         edge_types = []
         equal_edge_indices = []
-        for i, (fit1, fit2) in enumerate(zip(f1, f2)):
+        for i, (fit1, fit2) in enumerate(zip(f1, f2, strict=True)):
             if fit2 < fit1:
                 edge_types.append("improving")
             elif fit2 == fit1:
@@ -460,27 +458,16 @@ class CMLON:
         n_global_funnels = sum(1 for f in sinks_fit if f == best)
 
         # Neutral: proportion of contracted nodes
-        if self.source_lon is not None:
-            neutral = round(1.0 - self.n_vertices / self.source_lon.n_vertices, 4)
-        else:
-            neutral = 0.0
+        neutral = round(1.0 - self.n_vertices / self.source_lon.n_vertices, 4) if self.source_lon is not None else 0.0
 
         # Strength: ratio of incoming strength to global vs local sinks
-        igs = [s for s, f in zip(sinks_id, sinks_fit) if f == best]
-        ils = [s for s, f in zip(sinks_id, sinks_fit) if best is not None and f > best]
+        igs = [s for s, f in zip(sinks_id, sinks_fit, strict=True) if f == best]
+        ils = [s for s, f in zip(sinks_id, sinks_fit, strict=True) if best is not None and f > best]
 
         if self.n_edges > 0:
             edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
-            sing = (
-                sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights))
-                if igs
-                else 0
-            )
-            sinl = (
-                sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights))
-                if ils
-                else 0
-            )
+            sing = sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights)) if igs else 0
+            sinl = sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights)) if ils else 0
             total = sing + sinl
             strength = round(sing / total, 4) if total > 0 else 0.0
         else:

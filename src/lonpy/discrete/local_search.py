@@ -1,6 +1,6 @@
 import random
 
-from lonpy.discrete.neighborhoods import Neighborhood
+from lonpy.discrete.neighborhoods import FlipNeighborhood, Neighborhood
 from lonpy.discrete.solution import Solution
 from lonpy.problems.base import ProblemInstance
 
@@ -45,7 +45,7 @@ def hill_climb(
 
         for idx in indices:
             # Use delta evaluation if available (for FlipNeighborhood)
-            if hasattr(neighborhood, "evaluate_neighbor_with_delta"):
+            if isinstance(neighborhood, FlipNeighborhood) and isinstance(idx, int):
                 neighbor_fitness = neighborhood.evaluate_neighbor_with_delta(current, idx, problem)
                 neighbor = None  # Lazy creation
             else:

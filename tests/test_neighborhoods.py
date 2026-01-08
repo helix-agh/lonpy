@@ -65,7 +65,7 @@ class TestFlipNeighborhood:
         perturbed = neighborhood.apply_random_perturbation(solution, strength=3, rng=rng)
 
         # Count how many bits differ
-        differences = sum(a != b for a, b in zip(solution.data, perturbed.data))
+        differences = sum(a != b for a, b in zip(solution.data, perturbed.data, strict=True))
         assert differences == 3
 
     def test_apply_random_perturbation_caps_at_solution_length(self):
@@ -75,7 +75,7 @@ class TestFlipNeighborhood:
 
         perturbed = neighborhood.apply_random_perturbation(solution, strength=10, rng=rng)
 
-        differences = sum(a != b for a, b in zip(solution.data, perturbed.data))
+        differences = sum(a != b for a, b in zip(solution.data, perturbed.data, strict=True))
         assert differences == 3  # Capped at solution length
 
     def test_apply_random_perturbation_preserves_original(self):

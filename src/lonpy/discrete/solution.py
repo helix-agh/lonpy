@@ -85,10 +85,7 @@ class Solution:
         Returns:
             Solution with random 0/1 values.
         """
-        if rng is None:
-            data = [random.randint(0, 1) for _ in range(n)]
-        else:
-            data = [rng.randint(0, 1) for _ in range(n)]
+        data = [random.randint(0, 1) for _ in range(n)] if rng is None else [rng.randint(0, 1) for _ in range(n)]
         return cls(data=data, representation="bitstring")
 
     @classmethod
@@ -111,9 +108,7 @@ class Solution:
         return cls(data=data, representation="permutation")
 
     @classmethod
-    def from_list(
-        cls, data: list[int], representation: RepresentationType = "bitstring"
-    ) -> Solution:
+    def from_list(cls, data: list[int], representation: RepresentationType = "bitstring") -> Solution:
         """
         Create a solution from a list.
 

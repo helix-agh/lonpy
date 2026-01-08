@@ -1,8 +1,16 @@
 import random
 from abc import ABC, abstractmethod
+from typing import Any, Protocol, cast
 
 from lonpy.discrete.solution import Solution
 from lonpy.problems.base import ProblemInstance
+
+
+class DeltaEvaluationSupport(Protocol):
+    """Protocol for problems that support delta evaluation."""
+
+    def supports_delta_evaluation(self) -> bool: ...
+    def flip_delta(self, solution: Any, index: int) -> float: ...
 
 
 class Neighborhood(ABC):
@@ -38,9 +46,7 @@ class Neighborhood(ABC):
         """
 
     @abstractmethod
-    def apply_random_perturbation(
-        self, solution: Solution, strength: int, rng: random.Random | None = None
-    ) -> Solution:
+    def apply_random_perturbation(self, solution: Solution, strength: int, rng: random.Random | None = None) -> Solution:
         """
         Apply random perturbation of given strength.
 
@@ -83,9 +89,7 @@ class FlipNeighborhood(Neighborhood):
         neighbor.flip(index)
         return neighbor
 
-    def apply_random_perturbation(
-        self, solution: Solution, strength: int, rng: random.Random | None = None
-    ) -> Solution:
+    def apply_random_perturbation(self, solution: Solution, strength: int, rng: random.Random | None = None) -> Solution:
         """
         Flip `strength` random bits.
 
@@ -126,10 +130,10 @@ class FlipNeighborhood(Neighborhood):
         if (
             hasattr(problem, "flip_delta")
             and hasattr(problem, "supports_delta_evaluation")
-            and problem.supports_delta_evaluation()
+            and cast(DeltaEvaluationSupport, problem).supports_delta_evaluation()
             and solution.fitness is not None
         ):
-            delta = problem.flip_delta(solution.data, index)
+            delta = cast(DeltaEvaluationSupport, problem).flip_delta(solution.data, index)
             return float(solution.fitness + delta)
 
         # Fall back to full evaluation
@@ -168,9 +172,7 @@ class SwapNeighborhood(Neighborhood):
         neighbor.swap(i, j)
         return neighbor
 
-    def apply_random_perturbation(
-        self, solution: Solution, strength: int, rng: random.Random | None = None
-    ) -> Solution:
+    def apply_random_perturbation(self, solution: Solution, strength: int, rng: random.Random | None = None) -> Solution:
         """
         Perform `strength` random swaps.
 

@@ -107,7 +107,7 @@ class ILSSampler:
         Returns:
             Scaled integer fitness.
         """
-        return int(round(fitness * scale))
+        return round(fitness * scale)
 
     def _run_single_ils(
         self,
@@ -153,9 +153,7 @@ class ILSSampler:
 
             iteration += 1
 
-            perturbed = neighborhood.apply_random_perturbation(
-                best, self.config.perturbation_strength, self._rng
-            )
+            perturbed = neighborhood.apply_random_perturbation(best, self.config.perturbation_strength, self._rng)
             perturbed.fitness = problem.evaluate(perturbed.data)
 
             new_optimum = hill_climb(
@@ -219,12 +217,12 @@ class ILSSampler:
 
         # Determine solution size
         if solution_size is None:
-            if hasattr(problem, "n"):
-                solution_size = problem.n
+            n = getattr(problem, "n", None)
+            if n is not None:
+                solution_size = int(n)
             else:
-                raise ValueError(
-                    "solution_size must be provided if problem doesn't have 'n' attribute"
-                )
+                raise ValueError("solution_size must be provided if problem doesn't have 'n' attribute")
+        assert solution_size is not None
 
         neighborhood = self._get_neighborhood()
         all_records: list[dict] = []
@@ -236,7 +234,7 @@ class ILSSampler:
             run_records = self._run_single_ils(run, problem, neighborhood, solution_size)
             all_records.extend(run_records)
 
-        trace_df = pd.DataFrame(all_records, columns=["run", "fit1", "node1", "fit2", "node2"])
+        trace_df = pd.DataFrame(all_records, columns=pd.Index(["run", "fit1", "node1", "fit2", "node2"]))
         return trace_df, all_records
 
     def sample_to_lon(

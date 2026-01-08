@@ -76,11 +76,7 @@ class Knapsack(ProblemInstance):
         capacity: Maximum total weight allowed.
 
     Example:
-        >>> problem = Knapsack(
-        ...     values=[60, 100, 120],
-        ...     weights=[10, 20, 30],
-        ...     capacity=50
-        ... )
+        >>> problem = Knapsack(values=[60, 100, 120], weights=[10, 20, 30], capacity=50)
         >>> solution = [1, 1, 0]  # take items 0 and 1
         >>> problem.evaluate(solution)
         160.0
@@ -109,10 +105,10 @@ class Knapsack(ProblemInstance):
         Returns:
             Total value if weight <= capacity, else 0.
         """
-        total_weight = sum(w * s for w, s in zip(self.weights, solution))
+        total_weight = sum(w * s for w, s in zip(self.weights, solution, strict=True))
         if total_weight > self.capacity:
             return 0.0
-        return float(sum(v * s for v, s in zip(self.values, solution)))
+        return float(sum(v * s for v, s in zip(self.values, solution, strict=True)))
 
     def supports_delta_evaluation(self) -> bool:
         """Knapsack does not support efficient delta evaluation."""
@@ -166,8 +162,8 @@ class NumberPartitioning(ProblemInstance):
         Returns:
             |sum(A) - sum(B)| where lower is better.
         """
-        sum_a = sum(item for item, bit in zip(self.items, solution) if bit == 0)
-        sum_b = sum(item for item, bit in zip(self.items, solution) if bit == 1)
+        sum_a = sum(item for item, bit in zip(self.items, solution, strict=True) if bit == 0)
+        sum_b = sum(item for item, bit in zip(self.items, solution, strict=True) if bit == 1)
         return float(abs(sum_a - sum_b))
 
     def supports_delta_evaluation(self) -> bool:

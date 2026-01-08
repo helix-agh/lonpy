@@ -243,9 +243,7 @@ class LONVisualizer:
         edge_colors = self.compute_edge_colors(lon_or_cmlon)
 
         node_colors = (
-            self.compute_cmlon_colors(lon_or_cmlon)
-            if isinstance(lon_or_cmlon, CMLON)
-            else self.compute_lon_colors(lon_or_cmlon)
+            self.compute_cmlon_colors(lon_or_cmlon) if isinstance(lon_or_cmlon, CMLON) else self.compute_lon_colors(lon_or_cmlon)
         )
         layout = self.get_layout(graph, seed=seed)
 
@@ -328,9 +326,7 @@ class LONVisualizer:
         edge_colors = self.compute_edge_colors(lon_or_cmlon)
 
         node_colors = (
-            self.compute_cmlon_colors(lon_or_cmlon)
-            if isinstance(lon_or_cmlon, CMLON)
-            else self.compute_lon_colors(lon_or_cmlon)
+            self.compute_cmlon_colors(lon_or_cmlon) if isinstance(lon_or_cmlon, CMLON) else self.compute_lon_colors(lon_or_cmlon)
         )
 
         layout = self.get_layout(graph, seed=seed)
@@ -456,9 +452,7 @@ class LONVisualizer:
         edge_colors = self.compute_edge_colors(lon_or_cmlon)
 
         node_colors = (
-            self.compute_cmlon_colors(lon_or_cmlon)
-            if isinstance(lon_or_cmlon, CMLON)
-            else self.compute_lon_colors(lon_or_cmlon)
+            self.compute_cmlon_colors(lon_or_cmlon) if isinstance(lon_or_cmlon, CMLON) else self.compute_lon_colors(lon_or_cmlon)
         )
 
         layout = self.get_layout(graph, seed=seed)
@@ -557,7 +551,7 @@ class LONVisualizer:
                 png_bytes = fig.to_image(format="png", width=width, height=height, scale=1)
                 frames.append(imageio.v3.imread(png_bytes, extension=".png"))
 
-            imageio.mimsave(
+            imageio.mimsave(  # type: ignore[no-matching-overload]
                 str(output_path),
                 frames,
                 fps=fps,

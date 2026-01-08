@@ -4,7 +4,7 @@ import pytest
 
 from lonpy.lon import CMLON, LON, MLON, _contract_vertices, _simplify_with_edge_sum
 
-COLUMNS = ["run", "fit1", "node1", "fit2", "node2"]
+COLUMNS = pd.Index(["run", "fit1", "node1", "fit2", "node2"])
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def worsening_edge_trace_df() -> pd.DataFrame:
             [0, 50, "B", 80, "C"],  # Worsening edge
             [0, 80, "C", 10, "D"],
         ],
-        columns=["run", "fit1", "node1", "fit2", "node2"],
+        columns=pd.Index(["run", "fit1", "node1", "fit2", "node2"]),
     )
 
 
@@ -188,7 +188,7 @@ class TestLONGetGlobalOptimaIndices:
                 [0, 100, "A", 10, "B"],
                 [1, 100, "A", 10, "C"],  # Both B and C have best fitness
             ],
-            columns=["run", "fit1", "node1", "fit2", "node2"],
+            columns=pd.Index(["run", "fit1", "node1", "fit2", "node2"]),
         )
 
         lon = LON.from_trace_data(trace)
@@ -500,7 +500,7 @@ class TestCMLONGetLocalSinks:
         local_sinks = cmlon.get_local_sinks()
 
         for sink_idx in local_sinks:
-            assert cmlon.vertex_fitness[sink_idx] > cmlon.best_fitness
+            assert cmlon.best_fitness and cmlon.vertex_fitness[sink_idx] > cmlon.best_fitness
 
     def test_no_local_sinks_when_all_global(self, simple_lon):
         cmlon = CMLON.from_lon(simple_lon)
@@ -723,7 +723,7 @@ class TestLONIntegration:
                 [2, 60, "G", 60, "H"],
                 [2, 60, "H", 10, "C"],
             ],
-            columns=["run", "fit1", "node1", "fit2", "node2"],
+            columns=pd.Index(["run", "fit1", "node1", "fit2", "node2"]),
         )
 
         lon = LON.from_trace_data(trace)

@@ -92,10 +92,7 @@ class BasinHoppingSampler:
         Returns:
             Hash string identifying the local optimum.
         """
-        if self.config.hash_digits < 0:
-            rounded = x
-        else:
-            rounded = np.round(x, self.config.hash_digits)
+        rounded = x if self.config.hash_digits < 0 else np.round(x, self.config.hash_digits)
 
         hash_str = "_".join(f"{v:.{max(0, self.config.hash_digits)}f}" for v in rounded)
         return hash_str
@@ -113,7 +110,7 @@ class BasinHoppingSampler:
         if self.config.hash_digits < 0:
             return int(fitness * 1e6)
         scale = 10**self.config.hash_digits
-        return int(round(fitness * scale))
+        return round(fitness * scale)
 
     def sample(
         self,
@@ -143,9 +140,7 @@ class BasinHoppingSampler:
 
         # Compute step size based on mode
         if self.config.step_mode == "percentage":
-            p = np.array(
-                [self.config.step_size * abs(domain[i][1] - domain[i][0]) for i in range(n_var)]
-            )
+            p = np.array([self.config.step_size * abs(domain[i][1] - domain[i][0]) for i in range(n_var)])
         else:
             p = self.config.step_size * np.ones(n_var)
 
@@ -241,7 +236,7 @@ class BasinHoppingSampler:
                     current_x = new_x.copy()
                     current_f = new_f
 
-        trace_df = pd.DataFrame(trace_records, columns=["run", "fit1", "node1", "fit2", "node2"])
+        trace_df = pd.DataFrame(trace_records, columns=pd.Index(["run", "fit1", "node1", "fit2", "node2"]))
         return trace_df, raw_records
 
     def sample_to_lon(
@@ -307,7 +302,7 @@ def compute_lon(
     if not isinstance(upper_bound, list):
         upper_bound = [upper_bound] * dim
 
-    domain = list(zip(lower_bound, upper_bound))
+    domain = list(zip(lower_bound, upper_bound, strict=True))
 
     config = BasinHoppingSamplerConfig(
         n_runs=n_runs,
