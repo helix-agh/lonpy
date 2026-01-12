@@ -7,7 +7,7 @@ Thank you for your interest in contributing to lonpy!
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/agh-a2s/lonpy.git
+git clone https://github.com/helix-agh/lonpy.git
 cd lonpy
 ```
 
@@ -123,5 +123,5 @@ Feature requests are welcome! Please:
 For questions about using lonpy:
 
 - Check the [documentation](index.md)
-- Search existing [issues](https://github.com/agh-a2s/lonpy/issues)
+- Search existing [issues](https://github.com/helix-agh/lonpy/issues)
 - Open a new issue with the "question" label

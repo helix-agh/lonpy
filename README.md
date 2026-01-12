@@ -27,7 +27,7 @@ pip install lonpy
 Or install from source:
 
 ```bash
-git clone https://github.com/agh-a2s/lonpy.git
+git clone https://github.com/helix-agh/lonpy.git
 cd lonpy
 pip install -e .
 ```
@@ -100,7 +100,7 @@ lon = sampler.sample_to_lon(rastrigin, domain)
 
 ## Documentation
 
-For full documentation, visit: [https://agh-a2s.github.io/lonpy](https://agh-a2s.github.io/lonpy)
+For full documentation, visit: [https://helix-agh.github.io/lonpy](https://helix-agh.github.io/lonpy)
 
 ## Contributing
 

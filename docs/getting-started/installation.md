@@ -17,7 +17,7 @@ pip install lonpy
 For the latest development version:
 
 ```bash
-git clone https://github.com/agh-a2s/lonpy.git
+git clone https://github.com/helix-agh/lonpy.git
 cd lonpy
 pip install -e .
 ```
@@ -42,7 +42,7 @@ lonpy automatically installs the following dependencies:
 To install lonpy with development dependencies for contributing:
 
 ```bash
-git clone https://github.com/agh-a2s/lonpy.git
+git clone https://github.com/helix-agh/lonpy.git
 cd lonpy
 pip install -e ".[dev]"
 ```

@@ -1,10 +1,10 @@
 site_name: lonpy
 site_description: Local Optima Networks for Continuous Optimization
-site_author: Your Name
-site_url: https://agh-a2s.github.io/lonpy
+site_author: HELIX AGH
+site_url: https://helix-agh.github.io/lonpy
 
-repo_name: agh-a2s/lonpy
-repo_url: https://github.com/agh-a2s/lonpy
+repo_name: helix-agh/lonpy
+repo_url: https://github.com/helix-agh/lonpy
 
 theme:
   name: material
@@ -88,7 +88,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/agh-a2s/lonpy
+      link: https://github.com/helix-agh/lonpy
     - icon: fontawesome/brands/python
       link: https://pypi.org/project/lonpy/
 
