@@ -102,6 +102,8 @@ class BasinHoppingSampler:
         else:
             rounded = np.round(x, self.config.hash_digits)
 
+        rounded = rounded + 0.0  # Convert -0.0 to 0.0 for consistent hashing
+
         hash_str = "_".join(f"{v:.{max(0, self.config.hash_digits)}f}" for v in rounded)
         return hash_str
 
