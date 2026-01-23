@@ -44,31 +44,44 @@ class LON:
         trace = trace.copy()
         trace.columns = pd.Index(["run", "fit1", "node1", "fit2", "node2"])
 
-        # Combine nodes from both columns
-        lnodes1 = trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"})
-        lnodes2 = trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"})
-        lnodes = pd.concat([lnodes1, lnodes2], ignore_index=True)
+        all_lnodes = []
+        all_ledges = []
 
-        ledges = trace[["node1", "node2"]].copy()
 
-        # Count node and edge occurrences
-        nodes = lnodes.groupby(["Node", "Fitness"], as_index=False).size()
+        # Processing optimisation paths of each for later aggregation into LON graph
+        for _run_id, run_data in trace.groupby("run"):
+            lnodes1 = run_data[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"})
+            lnodes2 = run_data[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"})
+            lnodes = pd.concat([lnodes1, lnodes2], ignore_index=True)
+
+            ledges = run_data[["node1", "node2"]].copy()
+
+            all_lnodes.append(lnodes)
+            all_ledges.append(ledges)
+
+        # Aggregate all runs' vertices and edges
+        all_lnodes = pd.concat(all_lnodes, ignore_index=True)
+        all_ledges = pd.concat(all_ledges, ignore_index=True)
+
+        nodes = all_lnodes.groupby(["Node", "Fitness"], as_index=False).size()
         nodes.columns = pd.Index(["Node", "Fitness", "Count"])
 
-        edges = ledges.groupby(["node1", "node2"], as_index=False).size()
+        edges = all_ledges.groupby(["node1", "node2"], as_index=False).size()
         edges.columns = pd.Index(["Start", "End", "Count"])
 
         graph = ig.Graph(directed=True)
 
+        # Add vertices to graph
         for _, row in nodes.iterrows():
             graph.add_vertex(name=str(row["Node"]), Fitness=row["Fitness"], Count=row["Count"])
 
+        # Add edges to graph
         for _, row in edges.iterrows():
             with contextlib.suppress(ValueError):
                 graph.add_edge(str(row["Start"]), str(row["End"]), Count=row["Count"])
 
         # Remove self-loops
-        graph = graph.simplify(multiple=False, loops=True)
+        graph = graph.simplify(combine_edges="sum", loops=True)
 
         best = nodes["Fitness"].min()
 
