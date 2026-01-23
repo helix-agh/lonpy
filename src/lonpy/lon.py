@@ -44,18 +44,18 @@ class LON:
         trace = trace.copy()
         trace.columns = pd.Index(["run", "fit1", "node1", "fit2", "node2"])
 
-        # Combine nodes from both columns
-        lnodes1 = trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"})
-        lnodes2 = trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"})
-        lnodes = pd.concat([lnodes1, lnodes2], ignore_index=True)
+        lnodes = pd.concat(
+            [
+                trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"}),
+                trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"}),
+            ],
+            ignore_index=True,
+        )
 
-        ledges = trace[["node1", "node2"]].copy()
-
-        # Count node and edge occurrences
         nodes = lnodes.groupby(["Node", "Fitness"], as_index=False).size()
         nodes.columns = pd.Index(["Node", "Fitness", "Count"])
 
-        edges = ledges.groupby(["node1", "node2"], as_index=False).size()
+        edges = trace.groupby(["node1", "node2"], as_index=False).size()
         edges.columns = pd.Index(["Start", "End", "Count"])
 
         graph = ig.Graph(directed=True)
@@ -68,7 +68,7 @@ class LON:
                 graph.add_edge(str(row["Start"]), str(row["End"]), Count=row["Count"])
 
         # Remove self-loops
-        graph = graph.simplify(multiple=False, loops=True)
+        graph = graph.simplify(multiple="sum", loops=True)
 
         best = nodes["Fitness"].min()
 
