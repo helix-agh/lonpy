@@ -120,7 +120,7 @@ class BasinHoppingSampler:
         if self.config.hash_digits < 0:
             return int(fitness * 1e6)
         scale = 10**self.config.hash_digits
-        return int(round(fitness * scale))
+        return round(fitness * scale)
 
     def sample(
         self,
