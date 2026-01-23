@@ -192,8 +192,6 @@ class BasinHoppingSampler:
             run_index = 0
 
             while runs_without_improvement < self.config.n_iterations:
-                run_index += 1
-
                 if self.config.bounded and bounds_array is not None:
                     x_perturbed = self.bounded_perturbation(current_x, p, bounds_array)
                     res = minimize(
@@ -255,6 +253,8 @@ class BasinHoppingSampler:
 
                     current_x = new_x.copy()
                     current_f = new_f
+
+                run_index += 1
 
         trace_df = pd.DataFrame(trace_records, columns=["run", "fit1", "node1", "fit2", "node2"])
         return trace_df, raw_records
