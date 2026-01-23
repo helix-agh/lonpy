@@ -16,6 +16,13 @@ class BasinHoppingSamplerConfig:
     """
     Configuration for Basin-Hopping sampling.
 
+    Default values have been set to match the paper
+      Jason Adair, Gabriela Ochoa, and Katherine M. Malan. 2019.
+      Local optima networks for continuous fitness landscapes.
+      In Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO '19).
+      Association for Computing Machinery, New York, NY, USA, 1407-1414.
+      https://doi.org/10.1145/3319619.3326852
+
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
         n_iterations: Number of iterations per run.
@@ -37,10 +44,12 @@ class BasinHoppingSamplerConfig:
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     opt_digits: int = -1
-    hash_digits: int = 4
+    hash_digits: int = 5
     bounded: bool = True
     minimizer_method: str = "L-BFGS-B"
-    minimizer_options: dict = field(default_factory=lambda: {"ftol": 1e-07, "gtol": 1e-05})
+    minimizer_options: dict = field(
+        default_factory=lambda: {"ftol": 1e-07, "gtol": 0, "maxiter": 15000}
+    )
     seed: int | None = None
 
 
