@@ -186,10 +186,15 @@ class BasinHoppingSampler:
                 current_x = np.copy(res.x)
                 current_f = res.fun
             else:
-                current_x = np.round(res.x, self.config.opt_digits)
-                current_f = np.round(func(current_x), self.config.opt_digits)
+                current_x = np.round(np.copy(res.x), self.config.opt_digits)
+                current_f = np.round(res.fun, self.config.opt_digits)
 
-            for iteration in range(1, self.config.n_iterations + 1):
+            runs_without_improvement = 0
+            run_index = 0
+
+            while runs_without_improvement < self.config.n_iterations:
+                run_index += 1
+
                 if self.config.bounded:
                     x_perturbed = self.bounded_perturbation(current_x, p, domain)
                     res = minimize(
@@ -212,13 +217,13 @@ class BasinHoppingSampler:
                     new_x = np.copy(res.x)
                     new_f = res.fun
                 else:
-                    new_x = np.round(res.x, self.config.opt_digits)
-                    new_f = np.round(func(new_x), self.config.opt_digits)
+                    new_x = np.round(np.copy(res.x), self.config.opt_digits)
+                    new_f = np.round(res.fun, self.config.opt_digits)
 
                 raw_records.append(
                     {
                         "run": run,
-                        "iteration": iteration,
+                        "iteration": run_index,
                         "current_x": current_x.copy(),
                         "current_f": current_f,
                         "new_x": new_x.copy(),
@@ -228,6 +233,11 @@ class BasinHoppingSampler:
                 )
 
                 # Acceptance criterion (minimization: accept if better or equal)
+                if current_f < new_f:
+                    runs_without_improvement = 0
+                else:
+                    runs_without_improvement += 1
+
                 if new_f <= current_f:
                     node1 = self.hash_solution(current_x, current_f)
                     node2 = self.hash_solution(new_x, new_f)
