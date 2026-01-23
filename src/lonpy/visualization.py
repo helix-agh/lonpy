@@ -330,7 +330,7 @@ class LONVisualizer:
                 ),
                 zaxis=dict(
                     showgrid=False,
-                    title="Fitness",
+                    title="",
                     showbackground=False,
                 ),
                 camera=dict(
@@ -462,7 +462,7 @@ class LONVisualizer:
                         ),
                         zaxis=dict(
                             showgrid=False,
-                            title="Fitness",
+                            title="",
                             showbackground=False,
                         ),
                         camera=dict(
