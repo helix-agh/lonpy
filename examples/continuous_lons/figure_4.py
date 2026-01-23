@@ -36,8 +36,11 @@ def create_lon_for_benchmark(
         n_iterations=N_ITERATIONS,
         step_mode="fixed",
         step_size=step_size,
-        hash_digits=4,
+        hash_digits=5,
         seed=seed,
+        minimizer_options={
+            "options": {"ftol": 1e-7, "gtol": 0, "maxiter": 15000},
+        },
     )
 
     sampler = BasinHoppingSampler(config)
