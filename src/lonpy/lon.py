@@ -73,7 +73,7 @@ class LON:
                 graph.add_edge(str(row["Start"]), str(row["End"]), Count=row["Count"])
 
         # Remove self-loops
-        graph = graph.simplify(multiple="sum", loops=True)
+        graph = _simplify_with_edge_sum(graph)
 
         best = nodes["Fitness"].min()
 
