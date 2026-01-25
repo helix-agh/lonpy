@@ -311,9 +311,6 @@ class CMLON:
             vertex_attr_comb={"Fitness": "first", "Count": "sum", "name": "first"},
         )
 
-        # Combine parallel edges by summing Count
-        cmlon_graph = _simplify_with_edge_sum(cmlon_graph)
-
         return cls(graph=cmlon_graph, best_fitness=lon.best_fitness, source_lon=lon)
 
     @property
