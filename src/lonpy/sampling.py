@@ -39,7 +39,7 @@ class BasinHoppingSamplerConfig:
         seed: Random seed for reproducibility.
     """
 
-    n_runs: int = 10
+    n_runs: int = 100
     n_iterations: int = 1000
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
