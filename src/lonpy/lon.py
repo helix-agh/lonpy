@@ -17,10 +17,12 @@ class LON:
     Attributes:
         graph: The underlying igraph Graph object.
         best_fitness: The best (minimum) fitness value found.
+        final_run_values: Dictionary mapping run number to final fitness value.
     """
 
     graph: ig.Graph = field(default_factory=lambda: ig.Graph(directed=True))
     best_fitness: float | None = None
+    final_run_values: pd.Series | None = None
 
     @classmethod
     def from_trace_data(
@@ -44,18 +46,21 @@ class LON:
         trace = trace.copy()
         trace.columns = pd.Index(["run", "fit1", "node1", "fit2", "node2"])
 
-        # Combine nodes from both columns
-        lnodes1 = trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"})
-        lnodes2 = trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"})
-        lnodes = pd.concat([lnodes1, lnodes2], ignore_index=True)
+        # Extract final fitness value from each run as a Series
+        final_run_values = trace.groupby("run").tail(1).set_index("run")["fit2"]
 
-        ledges = trace[["node1", "node2"]].copy()
+        lnodes = pd.concat(
+            [
+                trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"}),
+                trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"}),
+            ],
+            ignore_index=True,
+        )
 
-        # Count node and edge occurrences
         nodes = lnodes.groupby(["Node", "Fitness"], as_index=False).size()
         nodes.columns = pd.Index(["Node", "Fitness", "Count"])
 
-        edges = ledges.groupby(["node1", "node2"], as_index=False).size()
+        edges = trace.groupby(["node1", "node2"], as_index=False).size()
         edges.columns = pd.Index(["Start", "End", "Count"])
 
         graph = ig.Graph(directed=True)
@@ -72,7 +77,7 @@ class LON:
 
         best = nodes["Fitness"].min()
 
-        return cls(graph=graph, best_fitness=best)
+        return cls(graph=graph, best_fitness=best, final_run_values=final_run_values)
 
     @property
     def n_vertices(self) -> int:
@@ -108,7 +113,7 @@ class LON:
         """Get indices of global optima nodes (nodes at best fitness)."""
         return [i for i, f in enumerate(self.vertex_fitness) if f == self.best_fitness]
 
-    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+    def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
         Compute LON metrics.
 
@@ -144,7 +149,7 @@ class LON:
 
         if neutral_edge_indices:
             gnn = self.graph.subgraph_edges(neutral_edge_indices, delete_vertices=True)
-            gnn = gnn.simplify(multiple=False, loops=True)
+            gnn = gnn.simplify(multiple="sum", loops=True)
             neutral = round(gnn.vcount() / n_optima, 4)
         else:
             neutral = 0.0
@@ -166,6 +171,56 @@ class LON:
             "neutral": neutral,
             "strength": strength,
         }
+
+    def compute_performance_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute performance metrics based on sampling runs.
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing:
+                - success: Proportion of runs that reached the global optimum
+                - deviation: Mean absolute deviation from the global optimum
+        """
+        best = known_best if known_best is not None else self.best_fitness
+        # Success: proportion of runs that reached the global optimum
+        success = (
+            (self.final_run_values == best).sum() / len(self.final_run_values)
+            if self.final_run_values is not None
+            else 0.0
+        )
+
+        # Deviation: mean deviation from the global optimum value
+        deviation = (
+            (self.final_run_values - best).abs().mean()
+            if self.final_run_values is not None and best is not None
+            else 0.0
+        )
+
+        return {"success": success, "deviation": deviation}
+
+    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute all LON metrics (network topology + performance).
+
+        This is a convenience method that combines both network metrics
+        (topology-based) and performance metrics (run-based).
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing all network and performance metrics:
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, strength
+                Performance metrics: success, deviation
+        """
+        network_metrics = self.compute_network_metrics(known_best)
+        performance_metrics = self.compute_performance_metrics(known_best)
+        return {**network_metrics, **performance_metrics}
 
     def to_cmlon(self) -> "CMLON":
         """
@@ -256,9 +311,6 @@ class CMLON:
             vertex_attr_comb={"Fitness": "first", "Count": "sum", "name": "first"},
         )
 
-        # Combine parallel edges by summing Count
-        cmlon_graph = _simplify_with_edge_sum(cmlon_graph)
-
         return cls(graph=cmlon_graph, best_fitness=lon.best_fitness, source_lon=lon)
 
     @property
@@ -300,7 +352,7 @@ class CMLON:
             return []
         return [s for s in sinks if fits[s] > self.best_fitness]
 
-    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+    def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
         Compute CMLON metrics.
 
@@ -334,9 +386,8 @@ class CMLON:
         else:
             neutral = 0.0
 
-        # Strength: ratio of incoming strength to global vs local sinks
+        # Strength: normalised ratio of incoming strength to global
         igs = [s for s, f in zip(sinks_id, sinks_fit) if f == best]
-        ils = [s for s, f in zip(sinks_id, sinks_fit) if best is not None and f > best]
 
         if self.n_edges > 0:
             edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
@@ -345,12 +396,7 @@ class CMLON:
                 if igs
                 else 0
             )
-            sinl = (
-                sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights))
-                if ils
-                else 0
-            )
-            total = sing + sinl
+            total = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
             strength = round(sing / total, 4) if total > 0 else 0.0
         else:
             strength = 0.0
@@ -379,6 +425,48 @@ class CMLON:
             reachable.update(component)
 
         return len(reachable) / self.n_vertices if self.n_vertices > 0 else 0.0
+
+    def compute_performance_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute performance metrics from the source LON.
+
+        CMLON delegates to its source LON for performance metrics since
+        it doesn't have its own sampling run data.
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing performance metrics from source LON, or
+            empty dict if no source LON is available.
+        """
+        return (
+            self.source_lon.compute_performance_metrics(known_best)
+            if self.source_lon is not None
+            else {}
+        )
+
+    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute all CMLON metrics (network topology + performance).
+
+        This is a convenience method that combines both CMLON-specific network
+        metrics and performance metrics from the source LON.
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing all network and performance metrics:
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral,
+                    strength, global_funnel_proportion
+                Performance metrics: success, deviation (from source LON)
+        """
+        network_metrics = self.compute_network_metrics(known_best)
+        performance_metrics = self.compute_performance_metrics(known_best)
+        return {**network_metrics, **performance_metrics}
 
 
 def _contract_vertices(

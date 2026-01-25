@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -16,6 +16,13 @@ class BasinHoppingSamplerConfig:
     """
     Configuration for Basin-Hopping sampling.
 
+    Default values have been set to match the paper
+      Jason Adair, Gabriela Ochoa, and Katherine M. Malan. 2019.
+      Local optima networks for continuous fitness landscapes.
+      In Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO '19).
+      Association for Computing Machinery, New York, NY, USA, 1407-1414.
+      https://doi.org/10.1145/3319619.3326852
+
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
         n_iterations: Number of iterations per run.
@@ -32,15 +39,17 @@ class BasinHoppingSamplerConfig:
         seed: Random seed for reproducibility.
     """
 
-    n_runs: int = 10
+    n_runs: int = 100
     n_iterations: int = 1000
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     opt_digits: int = -1
-    hash_digits: int = 4
+    hash_digits: int = 5
     bounded: bool = True
     minimizer_method: str = "L-BFGS-B"
-    minimizer_options: dict = field(default_factory=lambda: {"ftol": 1e-07, "gtol": 1e-05})
+    minimizer_options: dict = field(
+        default_factory=lambda: {"ftol": 1e-07, "gtol": 0, "maxiter": 15000}
+    )
     seed: int | None = None
 
 
@@ -65,10 +74,9 @@ class BasinHoppingSampler:
         self,
         x: np.ndarray,
         p: np.ndarray,
-        domain: list[tuple[float, float]],
+        bounds: np.ndarray,
     ) -> np.ndarray:
         y = x + np.random.uniform(low=-p, high=p)
-        bounds = np.array(domain)
         return np.clip(y, bounds[:, 0], bounds[:, 1])
 
     def unbounded_perturbation(self, x: np.ndarray, p: np.ndarray) -> np.ndarray:
@@ -93,6 +101,8 @@ class BasinHoppingSampler:
         else:
             rounded = np.round(x, self.config.hash_digits)
 
+        rounded = rounded + 0.0  # Convert -0.0 to 0.0 for consistent hashing
+
         hash_str = "_".join(f"{v:.{max(0, self.config.hash_digits)}f}" for v in rounded)
         return hash_str
 
@@ -113,7 +123,7 @@ class BasinHoppingSampler:
 
     def sample(
         self,
-        func: Callable[[np.ndarray], float],
+        func: Callable[[Sequence], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> tuple[pd.DataFrame, list[dict]]:
@@ -135,16 +145,16 @@ class BasinHoppingSampler:
             np.random.seed(self.config.seed)
 
         n_var = len(domain)
+        domain_array = np.array(domain)
 
         # Compute step size based on mode
         if self.config.step_mode == "percentage":
-            p = np.array(
-                [self.config.step_size * abs(domain[i][1] - domain[i][0]) for i in range(n_var)]
-            )
+            p = self.config.step_size * np.abs(domain_array[:, 1] - domain_array[:, 0])
         else:
             p = self.config.step_size * np.ones(n_var)
 
-        bounds = [(d[0], d[1]) for d in domain] if self.config.bounded else None
+        bounds_scipy = domain if self.config.bounded else None
+        bounds_array = domain_array if self.config.bounded else None
         trace_records = []
         raw_records = []
 
@@ -153,7 +163,7 @@ class BasinHoppingSampler:
                 progress_callback(run, self.config.n_runs)
 
             # Random initial point
-            x0 = np.array([np.random.uniform(d[0], d[1]) for d in domain])
+            x0 = np.random.uniform(domain_array[:, 0], domain_array[:, 1])
 
             if self.config.bounded:
                 res = minimize(
@@ -161,7 +171,7 @@ class BasinHoppingSampler:
                     x0,
                     method=self.config.minimizer_method,
                     options=self.config.minimizer_options,
-                    bounds=bounds,
+                    bounds=bounds_scipy,
                 )
             else:
                 res = minimize(
@@ -172,20 +182,23 @@ class BasinHoppingSampler:
                 )
 
             if self.config.opt_digits < 0:
-                current_x = np.copy(res.x)
+                current_x = res.x
                 current_f = res.fun
             else:
                 current_x = np.round(res.x, self.config.opt_digits)
                 current_f = np.round(func(current_x), self.config.opt_digits)
 
-            for iteration in range(1, self.config.n_iterations + 1):
-                if self.config.bounded:
-                    x_perturbed = self.bounded_perturbation(current_x, p, domain)
+            runs_without_improvement = 0
+            run_index = 0
+
+            while runs_without_improvement < self.config.n_iterations:
+                if self.config.bounded and bounds_array is not None:
+                    x_perturbed = self.bounded_perturbation(current_x, p, bounds_array)
                     res = minimize(
                         func,
                         x_perturbed,
                         method=self.config.minimizer_method,
-                        bounds=bounds,
+                        bounds=bounds_scipy,
                         options=self.config.minimizer_options,
                     )
                 else:
@@ -198,7 +211,7 @@ class BasinHoppingSampler:
                     )
 
                 if self.config.opt_digits < 0:
-                    new_x = np.copy(res.x)
+                    new_x = res.x
                     new_f = res.fun
                 else:
                     new_x = np.round(res.x, self.config.opt_digits)
@@ -207,7 +220,7 @@ class BasinHoppingSampler:
                 raw_records.append(
                     {
                         "run": run,
-                        "iteration": iteration,
+                        "iteration": run_index,
                         "current_x": current_x.copy(),
                         "current_f": current_f,
                         "new_x": new_x.copy(),
@@ -215,6 +228,11 @@ class BasinHoppingSampler:
                         "accepted": new_f <= current_f,
                     }
                 )
+
+                if new_f < current_f:
+                    runs_without_improvement = 0
+                else:
+                    runs_without_improvement += 1
 
                 # Acceptance criterion (minimization: accept if better or equal)
                 if new_f <= current_f:
@@ -236,12 +254,14 @@ class BasinHoppingSampler:
                     current_x = new_x.copy()
                     current_f = new_f
 
+                run_index += 1
+
         trace_df = pd.DataFrame(trace_records, columns=["run", "fit1", "node1", "fit2", "node2"])
         return trace_df, raw_records
 
     def sample_to_lon(
         self,
-        func: Callable[[np.ndarray], float],
+        func: Callable[[Sequence], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> LON:
@@ -254,10 +274,10 @@ class BasinHoppingSampler:
 
 
 def compute_lon(
-    func: Callable[[np.ndarray], float],
+    func: Callable[[Sequence], float],
     dim: int,
-    lower_bound: float | list[float],
-    upper_bound: float | list[float],
+    lower_bound: float | Sequence[float],
+    upper_bound: float | Sequence[float],
     seed: int | None = None,
     step_size: float = 0.01,
     step_mode: StepMode = "percentage",
@@ -276,8 +296,8 @@ def compute_lon(
     Args:
         func: Objective function f(x) -> float to minimize.
         dim: Number of dimensions.
-        lower_bound: Lower bound (scalar or per-dimension list).
-        upper_bound: Upper bound (scalar or per-dimension list).
+        lower_bound: Lower bound (scalar or per-dimension list/array).
+        upper_bound: Upper bound (scalar or per-dimension list/array).
         seed: Random seed for reproducibility.
         step_size: Perturbation step size.
         step_mode: "percentage" (of domain) or "fixed".
@@ -297,12 +317,15 @@ def compute_lon(
         >>> lon = compute_lon(sphere, dim=5, lower_bound=-5.0, upper_bound=5.0)
         >>> print(f"Found {lon.n_vertices} local optima")
     """
-    if not isinstance(lower_bound, list):
-        lower_bound = [lower_bound] * dim
-    if not isinstance(upper_bound, list):
-        upper_bound = [upper_bound] * dim
+    # Convert scalars to lists, leave sequences as-is
+    lower_bounds: Sequence[float] = (
+        [lower_bound] * dim if isinstance(lower_bound, int | float) else lower_bound
+    )
+    upper_bounds: Sequence[float] = (
+        [upper_bound] * dim if isinstance(upper_bound, int | float) else upper_bound
+    )
 
-    domain = list(zip(lower_bound, upper_bound))
+    domain = list(zip(lower_bounds, upper_bounds, strict=True))
 
     config = BasinHoppingSamplerConfig(
         n_runs=n_runs,
