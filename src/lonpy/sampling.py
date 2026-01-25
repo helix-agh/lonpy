@@ -186,7 +186,7 @@ class BasinHoppingSampler:
                 current_f = res.fun
             else:
                 current_x = np.round(res.x, self.config.opt_digits)
-                current_f = np.round(res.fun, self.config.opt_digits)
+                current_f = np.round(func(current_x), self.config.opt_digits)
 
             runs_without_improvement = 0
             run_index = 0
@@ -215,7 +215,7 @@ class BasinHoppingSampler:
                     new_f = res.fun
                 else:
                     new_x = np.round(res.x, self.config.opt_digits)
-                    new_f = np.round(res.fun, self.config.opt_digits)
+                    new_f = np.round(func(new_x), self.config.opt_digits)
 
                 raw_records.append(
                     {
