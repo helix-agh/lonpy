@@ -119,7 +119,7 @@ class BasinHoppingSampler:
         if self.config.hash_digits < 0:
             return int(fitness * 1e6)
         scale = 10**self.config.hash_digits
-        return np.round(fitness * scale)
+        return int(round(fitness * scale))
 
     def sample(
         self,
@@ -319,10 +319,10 @@ def compute_lon(
     """
     # Convert scalars to lists, leave sequences as-is
     lower_bounds: Sequence[float] = (
-        [lower_bound] * dim if isinstance(lower_bound, (int, float)) else lower_bound
+        [lower_bound] * dim if isinstance(lower_bound, int | float) else lower_bound
     )
     upper_bounds: Sequence[float] = (
-        [upper_bound] * dim if isinstance(upper_bound, (int, float)) else upper_bound
+        [upper_bound] * dim if isinstance(upper_bound, int | float) else upper_bound
     )
 
     domain = list(zip(lower_bounds, upper_bounds, strict=True))

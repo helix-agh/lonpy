@@ -396,9 +396,7 @@ class CMLON:
                 if igs
                 else 0
             )
-            total = (
-                sum(self.graph.strength( mode="in", loops=False, weights=edge_weights))
-            )
+            total = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
             strength = round(sing / total, 4) if total > 0 else 0.0
         else:
             strength = 0.0
