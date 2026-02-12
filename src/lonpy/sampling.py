@@ -43,8 +43,8 @@ class BasinHoppingSamplerConfig:
     n_iterations: int = 1000
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
-    opt_digits: int = -1
-    hash_digits: int = 5
+    fitness_precision: int = -1
+    coordinate_precision: int = 5
     bounded: bool = True
     minimizer_method: str = "L-BFGS-B"
     minimizer_options: dict = field(
@@ -96,14 +96,10 @@ class BasinHoppingSampler:
         Returns:
             Hash string identifying the local optimum.
         """
-        if self.config.hash_digits < 0:
-            rounded = x
-        else:
-            rounded = np.round(x, self.config.hash_digits)
 
-        rounded = rounded + 0.0  # Convert -0.0 to 0.0 for consistent hashing
+        x += 0.0  # Convert -0.0 to 0.0 for consistent hashing
 
-        hash_str = "_".join(f"{v:.{max(0, self.config.hash_digits)}f}" for v in rounded)
+        hash_str = "_".join(f"{v:.{max(0, self.config.coordinate_precision)}f}" for v in x)
         return hash_str
 
     def fitness_to_int(self, fitness: float) -> int:
@@ -116,17 +112,17 @@ class BasinHoppingSampler:
         Returns:
             Scaled integer fitness value.
         """
-        if self.config.hash_digits < 0:
+        if self.config.fitness_precision < 0:
             return int(fitness * 1e6)
-        scale = 10**self.config.hash_digits
+        scale = 10**self.config.fitness_precision
         return int(round(fitness * scale))
 
-    def sample(
+    def _basin_hopping_sampling(
         self,
         func: Callable[[Sequence], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
-    ) -> tuple[pd.DataFrame, list[dict]]:
+    ) -> list[dict]:
         """
         Run Basin-Hopping sampling to generate LON data.
 
@@ -155,7 +151,6 @@ class BasinHoppingSampler:
 
         bounds_scipy = domain if self.config.bounded else None
         bounds_array = domain_array if self.config.bounded else None
-        trace_records = []
         raw_records = []
 
         for run in range(1, self.config.n_runs + 1):
@@ -165,57 +160,36 @@ class BasinHoppingSampler:
             # Random initial point
             x0 = np.random.uniform(domain_array[:, 0], domain_array[:, 1])
 
-            if self.config.bounded:
-                res = minimize(
-                    func,
-                    x0,
-                    method=self.config.minimizer_method,
-                    options=self.config.minimizer_options,
-                    bounds=bounds_scipy,
-                )
-            else:
-                res = minimize(
-                    func,
-                    x0,
-                    method=self.config.minimizer_method,
-                    options=self.config.minimizer_options,
-                )
+            res = minimize(
+                func,
+                x0,
+                method=self.config.minimizer_method,
+                options=self.config.minimizer_options,
+                bounds=bounds_scipy if self.config.bounded else None,
+            )
 
-            if self.config.opt_digits < 0:
-                current_x = res.x
-                current_f = res.fun
-            else:
-                current_x = np.round(res.x, self.config.opt_digits)
-                current_f = np.round(func(current_x), self.config.opt_digits)
+            current_x = res.x
+            current_f = res.fun
 
             runs_without_improvement = 0
             run_index = 0
 
             while runs_without_improvement < self.config.n_iterations:
-                if self.config.bounded and bounds_array is not None:
-                    x_perturbed = self.bounded_perturbation(current_x, p, bounds_array)
-                    res = minimize(
-                        func,
-                        x_perturbed,
-                        method=self.config.minimizer_method,
-                        bounds=bounds_scipy,
-                        options=self.config.minimizer_options,
-                    )
-                else:
-                    x_perturbed = self.unbounded_perturbation(current_x, p)
-                    res = minimize(
-                        func,
-                        x_perturbed,
-                        method=self.config.minimizer_method,
-                        options=self.config.minimizer_options,
-                    )
+                x_perturbed = (
+                    self.bounded_perturbation(current_x, p, bounds_array)
+                    if self.config.bounded and bounds_array is not None
+                    else self.unbounded_perturbation(current_x, p)
+                )
+                res = minimize(
+                    func,
+                    x_perturbed,
+                    method=self.config.minimizer_method,
+                    options=self.config.minimizer_options,
+                    bounds=bounds_scipy if self.config.bounded else None,
+                )
 
-                if self.config.opt_digits < 0:
-                    new_x = res.x
-                    new_f = res.fun
-                else:
-                    new_x = np.round(res.x, self.config.opt_digits)
-                    new_f = np.round(func(new_x), self.config.opt_digits)
+                new_x = res.x
+                new_f = res.fun
 
                 raw_records.append(
                     {
@@ -236,27 +210,93 @@ class BasinHoppingSampler:
 
                 # Acceptance criterion (minimization: accept if better or equal)
                 if new_f <= current_f:
-                    node1 = self.hash_solution(current_x, current_f)
-                    node2 = self.hash_solution(new_x, new_f)
-                    fit1 = self.fitness_to_int(current_f)
-                    fit2 = self.fitness_to_int(new_f)
-
-                    trace_records.append(
-                        {
-                            "run": run,
-                            "fit1": fit1,
-                            "node1": node1,
-                            "fit2": fit2,
-                            "node2": node2,
-                        }
-                    )
-
                     current_x = new_x.copy()
                     current_f = new_f
 
                 run_index += 1
 
+        return raw_records
+
+    def _construct_trace_data(self, raw_records: list[dict]) -> pd.DataFrame:
+        """
+        Construct trace data by connecting consecutive accepted records within each run.
+
+        Args:
+            raw_records: List of raw sampling records from basin hopping.
+
+        Returns:
+            DataFrame with columns [run, fit1, node1, fit2, node2] representing
+            transitions between consecutive accepted states.
+        """
+        trace_records = []
+
+        accepted_records = [r for r in raw_records if r["accepted"]]
+
+        # Each accepted record represents a state we moved to (new_x, new_f)
+        for i in range(len(accepted_records) - 1):
+            current_rec = accepted_records[i]
+            next_rec = accepted_records[i + 1]
+
+            if current_rec["run"] != next_rec["run"]:
+                continue
+
+            # From state: the accepted "new" state from current record
+            from_x = current_rec["new_x"]
+            from_f = current_rec["new_f"]
+
+            # To state: the accepted "new" state from next record
+            to_x = next_rec["new_x"]
+            to_f = next_rec["new_f"]
+
+            from_x_rounded = np.round(from_x, self.config.coordinate_precision)
+            to_x_rounded = np.round(to_x, self.config.coordinate_precision)
+
+            node1 = self.hash_solution(from_x_rounded, from_f)
+            node2 = self.hash_solution(to_x_rounded, to_f)
+
+            fit1 = np.round(from_f, self.config.fitness_precision)
+            fit2 = np.round(to_f, self.config.fitness_precision)
+            fit1 = from_f
+            fit2 = to_f
+
+            trace_records.append(
+                {
+                    "run": current_rec["run"],
+                    "fit1": fit1,
+                    "node1": node1,
+                    "fit2": fit2,
+                    "node2": node2,
+                }
+            )
+
         trace_df = pd.DataFrame(trace_records, columns=["run", "fit1", "node1", "fit2", "node2"])
+        return trace_df
+
+    def sample(
+        self,
+        func: Callable[[Sequence], float],
+        domain: list[tuple[float, float]],
+        progress_callback: Callable[[int, int], None] | None = None,
+    ) -> tuple[pd.DataFrame, list[dict]]:
+        """
+        Run Basin-Hopping sampling and construct trace data.
+
+        Args:
+            func: Objective function to minimize (f: R^n -> R).
+            domain: List of (lower, upper) bounds per dimension.
+            progress_callback: Optional callback(run, total_runs) for progress.
+
+        Returns:
+            Tuple of (trace_df, raw_records):
+                - trace_df: DataFrame with columns [run, fit1, node1, fit2, node2]
+                - raw_records: List of dicts with detailed iteration data.
+        """
+        # Collect all raw sampling data
+        raw_records = self._basin_hopping_sampling(func, domain, progress_callback)
+
+        # Construct trace data from accepted transitions
+        trace_df = self._construct_trace_data(raw_records)
+
         return trace_df, raw_records
 
     def sample_to_lon(
@@ -283,8 +323,8 @@ def compute_lon(
     step_mode: StepMode = "percentage",
     n_runs: int = 10,
     n_iterations: int = 1000,
-    opt_digits: int = -1,
-    hash_digits: int = 4,
+    fitness_precision: int = -1,
+    coordinate_precision: int = 5,
     bounded: bool = True,
 ) -> LON:
     """
@@ -332,8 +372,8 @@ def compute_lon(
         n_iterations=n_iterations,
         step_mode=step_mode,
         step_size=step_size,
-        opt_digits=opt_digits,
-        hash_digits=hash_digits,
+        fitness_precision=fitness_precision,
+        coordinate_precision=coordinate_precision,
         bounded=bounded,
         seed=seed,
     )
