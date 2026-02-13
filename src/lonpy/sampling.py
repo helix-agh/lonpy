@@ -219,34 +219,25 @@ class BasinHoppingSampler:
 
     def _construct_trace_data(self, raw_records: list[dict]) -> pd.DataFrame:
         """
-        Construct trace data by connecting consecutive accepted records within each run.
+        Construct trace data from accepted transitions in raw records.
 
         Args:
             raw_records: List of raw sampling records from basin hopping.
 
         Returns:
             DataFrame with columns [run, fit1, node1, fit2, node2] representing
-            transitions between consecutive accepted states.
+            actual transitions from current_x to new_x for each accepted move.
         """
         trace_records = []
 
-        accepted_records = [r for r in raw_records if r["accepted"]]
-
-        # Each accepted record represents a state we moved to (new_x, new_f)
-        for i in range(len(accepted_records) - 1):
-            current_rec = accepted_records[i]
-            next_rec = accepted_records[i + 1]
-
-            if current_rec["run"] != next_rec["run"]:
+        for rec in raw_records:
+            if not rec["accepted"]:
                 continue
 
-            # From state: the accepted "new" state from current record
-            from_x = current_rec["new_x"]
-            from_f = current_rec["new_f"]
-
-            # To state: the accepted "new" state from next record
-            to_x = next_rec["new_x"]
-            to_f = next_rec["new_f"]
+            from_x = rec["current_x"]
+            from_f = rec["current_f"]
+            to_x = rec["new_x"]
+            to_f = rec["new_f"]
 
             from_x_rounded = np.round(from_x, self.config.coordinate_precision)
             to_x_rounded = np.round(to_x, self.config.coordinate_precision)
@@ -254,14 +245,12 @@ class BasinHoppingSampler:
             node1 = self.hash_solution(from_x_rounded, from_f)
             node2 = self.hash_solution(to_x_rounded, to_f)
 
-            fit1 = np.round(from_f, self.config.fitness_precision)
-            fit2 = np.round(to_f, self.config.fitness_precision)
             fit1 = from_f
             fit2 = to_f
 
             trace_records.append(
                 {
-                    "run": current_rec["run"],
+                    "run": rec["run"],
                     "fit1": fit1,
                     "node1": node1,
                     "fit2": fit2,
