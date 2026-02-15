@@ -1,4 +1,4 @@
-from lonpy.lon import CMLON, LON
+from lonpy.lon import CMLON, LON, LONConfig
 from lonpy.sampling import BasinHoppingSampler, BasinHoppingSamplerConfig, compute_lon
 from lonpy.visualization import LONVisualizer
 
@@ -8,6 +8,7 @@ __all__ = [
     "LON",
     "BasinHoppingSampler",
     "BasinHoppingSamplerConfig",
+    "LONConfig",
     "LONVisualizer",
     "compute_lon",
 ]

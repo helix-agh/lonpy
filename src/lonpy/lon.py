@@ -1,9 +1,33 @@
 import contextlib
+import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import igraph as ig
 import pandas as pd
+
+
+@dataclass
+class LONConfig:
+    """
+    Configuration for LON construction from trace data.
+
+    Attributes:
+        fitness_aggregation: Strategy for handling nodes with multiple fitness values:
+            - "min": Use minimum fitness
+            - "max": Use maximum fitness
+            - "mean": Use average fitness
+            - "first": Use first occurrence
+            - "strict": Raise error if duplicates are detected
+            Default: "min".
+        warn_on_duplicates: Whether to emit a warning when duplicate nodes detected. Default: `True`
+        max_fitness_deviation: If set, raise error if fitness deviation exceeds this threshold. Default: `None` (no threshold).
+            Useful for detecting data quality issues.
+    """
+
+    fitness_aggregation: Literal["min", "max", "mean", "first", "strict"] = "min"
+    warn_on_duplicates: bool = True
+    max_fitness_deviation: float | None = None
 
 
 @dataclass
@@ -28,6 +52,7 @@ class LON:
     def from_trace_data(
         cls,
         trace: pd.DataFrame,
+        config: LONConfig | None = None,
     ) -> "LON":
         """
         Create a LON from trace data.
@@ -39,10 +64,17 @@ class LON:
                 - node1: string hash of source node
                 - fit2: integer fitness of target node (scaled)
                 - node2: string hash of target node
+            config: Optional configuration for LON construction. If None, uses default
+                configuration with minimum fitness aggregation.
 
         Returns:
             LON instance with constructed graph.
+
+        Raises:
+            ValueError: If fitness_aggregation is "strict" and duplicates are detected,
+                or if max_fitness_deviation threshold is exceeded.
         """
+        config = config or LONConfig()
         trace = trace.copy()
         trace.columns = pd.Index(["run", "fit1", "node1", "fit2", "node2"])
 
@@ -57,8 +89,74 @@ class LON:
             ignore_index=True,
         )
 
-        nodes = lnodes.groupby(["Node", "Fitness"], as_index=False).size()
-        nodes.columns = pd.Index(["Node", "Fitness", "Count"])
+        # Node deduplication by grouping and aggregation
+        node_agg = (
+            lnodes.groupby("Node").agg({"Fitness": ["min", "max", "mean", "nunique"]}).reset_index()
+        )
+        node_agg.columns = pd.Index(
+            [
+                "Node",
+                "Fitness_min",
+                "Fitness_max",
+                "Fitness_mean",
+                "Fitness_nunique",
+            ]
+        )
+
+        visit_counts = lnodes.groupby("Node").size().reset_index(name="Count")
+
+        duplicates = node_agg[node_agg["Fitness_nunique"] > 1]
+        if not duplicates.empty:
+            max_deviation = (node_agg["Fitness_max"] - node_agg["Fitness_min"]).max()
+
+            if (
+                config.max_fitness_deviation is not None
+                and max_deviation > config.max_fitness_deviation
+            ):
+                raise ValueError(
+                    f"Fitness deviation ({max_deviation:.6f}) exceeds maximum allowed "
+                    f"threshold ({config.max_fitness_deviation:.6f}). "
+                    f"Found {len(duplicates)} node(s) with multiple fitness values. "
+                    f"This may indicate data quality issues."
+                )
+
+            if config.fitness_aggregation == "strict":
+                raise ValueError(
+                    f"Detected {len(duplicates)} node(s) with multiple fitness values "
+                    f"(max deviation: {max_deviation:.6f}) in strict mode. "
+                    f"Strict mode requires each node to have a unique fitness value. "
+                    f"Consider using a different fitness_aggregation strategy or "
+                    f"adjusting coordinate_precision/fitness_precision."
+                )
+
+            if config.warn_on_duplicates:
+                warnings.warn(
+                    f"Detected {len(duplicates)} node(s) with multiple fitness values "
+                    f"(max deviation: {max_deviation:.6f}). "
+                    f"Using '{config.fitness_aggregation}' fitness for each node. "
+                    f"This may indicate numerical precision issues or noisy fitness evaluation.",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
+
+        match config.fitness_aggregation:
+            case "first":
+                fitness_values = lnodes.groupby("Node", as_index=False).first()[["Node", "Fitness"]]
+            case "max":
+                fitness_values = node_agg[["Node", "Fitness_max"]].rename(
+                    columns={"Fitness_max": "Fitness"}
+                )
+            case "mean":
+                fitness_values = node_agg[["Node", "Fitness_mean"]].rename(
+                    columns={"Fitness_mean": "Fitness"}
+                )
+            case _:  # "min" or default
+                fitness_values = node_agg[["Node", "Fitness_min"]].rename(
+                    columns={"Fitness_min": "Fitness"}
+                )
+
+        # Merge fitness values with visit counts
+        nodes = pd.merge(fitness_values, visit_counts, on="Node")
 
         edges = trace.groupby(["node1", "node2"], as_index=False).size()
         edges.columns = pd.Index(["Start", "End", "Count"])
