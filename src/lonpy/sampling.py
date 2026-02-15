@@ -29,10 +29,11 @@ class BasinHoppingSamplerConfig:
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
-        opt_digits: Decimal precision for optimization results.
-            Use -1 for double precision.
-        hash_digits: Decimal precision for solution hashing. Solutions
-            rounded to this precision are considered identical.
+        fitness_precision: Decimal precision for fitness values.
+            Use -1 for full double precision.
+        coordinate_precision: Decimal precision for coordinate rounding and hashing.
+            Solutions rounded to this precision are considered identical.
+            Use -1 for full double precision (no rounding).
         bounded: Whether to enforce domain bounds during perturbation.
         minimizer_method: Scipy minimizer method (default: "L-BFGS-B").
         minimizer_options: Options passed to scipy.optimize.minimize.
@@ -70,19 +71,23 @@ class BasinHoppingSampler:
     def __init__(self, config: BasinHoppingSamplerConfig | None = None):
         self.config = config or BasinHoppingSamplerConfig()
 
-    def bounded_perturbation(
+    def _perturbation(
         self,
         x: np.ndarray,
         p: np.ndarray,
-        bounds: np.ndarray,
+        bounds: np.ndarray | None = None,
     ) -> np.ndarray:
         y = x + np.random.uniform(low=-p, high=p)
-        return np.clip(y, bounds[:, 0], bounds[:, 1])
+        if self.config.bounded and bounds is not None:
+            return np.clip(y, bounds[:, 0], bounds[:, 1])
+        return y
 
-    def unbounded_perturbation(self, x: np.ndarray, p: np.ndarray) -> np.ndarray:
-        return x + np.random.uniform(low=-p, high=p)
+    def _round_value(self, value: np.ndarray, precision: int) -> np.ndarray:
+        if precision < 0:
+            return value
+        return np.round(value, precision)
 
-    def hash_solution(self, x: np.ndarray, fitness: float = 0.0) -> str:  # noqa: ARG002
+    def _hash_solution(self, x: np.ndarray) -> str:
         """
         Create hash string for a solution.
 
@@ -99,10 +104,13 @@ class BasinHoppingSampler:
 
         x += 0.0  # Convert -0.0 to 0.0 for consistent hashing
 
-        hash_str = "_".join(f"{v:.{max(0, self.config.coordinate_precision)}f}" for v in x)
+        precision = self.config.coordinate_precision
+        formatter = str if precision < 0 else lambda v: f"{v:.{precision}f}"
+        hash_str = "_".join(formatter(v) for v in x)
+
         return hash_str
 
-    def fitness_to_int(self, fitness: float) -> int:
+    def _fitness_to_int(self, fitness: float) -> int:
         """
         Convert fitness to integer representation for storage.
 
@@ -149,7 +157,6 @@ class BasinHoppingSampler:
         else:
             p = self.config.step_size * np.ones(n_var)
 
-        bounds_scipy = domain if self.config.bounded else None
         bounds_array = domain_array if self.config.bounded else None
         raw_records = []
 
@@ -165,7 +172,7 @@ class BasinHoppingSampler:
                 x0,
                 method=self.config.minimizer_method,
                 options=self.config.minimizer_options,
-                bounds=bounds_scipy if self.config.bounded else None,
+                bounds=bounds_array if self.config.bounded else None,
             )
 
             current_x = res.x
@@ -175,17 +182,13 @@ class BasinHoppingSampler:
             run_index = 0
 
             while runs_without_improvement < self.config.n_iterations:
-                x_perturbed = (
-                    self.bounded_perturbation(current_x, p, bounds_array)
-                    if self.config.bounded and bounds_array is not None
-                    else self.unbounded_perturbation(current_x, p)
-                )
+                x_perturbed = self._perturbation(current_x, p, bounds_array)
                 res = minimize(
                     func,
                     x_perturbed,
                     method=self.config.minimizer_method,
                     options=self.config.minimizer_options,
-                    bounds=bounds_scipy if self.config.bounded else None,
+                    bounds=bounds_array if self.config.bounded else None,
                 )
 
                 new_x = res.x
@@ -239,14 +242,14 @@ class BasinHoppingSampler:
             to_x = rec["new_x"]
             to_f = rec["new_f"]
 
-            from_x_rounded = np.round(from_x, self.config.coordinate_precision)
-            to_x_rounded = np.round(to_x, self.config.coordinate_precision)
+            from_x_rounded = self._round_value(from_x, self.config.coordinate_precision)
+            to_x_rounded = self._round_value(to_x, self.config.coordinate_precision)
 
-            node1 = self.hash_solution(from_x_rounded, from_f)
-            node2 = self.hash_solution(to_x_rounded, to_f)
+            node1 = self._hash_solution(from_x_rounded)
+            node2 = self._hash_solution(to_x_rounded)
 
-            fit1 = from_f
-            fit2 = to_f
+            fit1 = self._round_value(from_f, self.config.fitness_precision)
+            fit2 = self._round_value(to_f, self.config.fitness_precision)
 
             trace_records.append(
                 {
@@ -332,8 +335,8 @@ def compute_lon(
         step_mode: "percentage" (of domain) or "fixed".
         n_runs: Number of independent Basin-Hopping runs.
         n_iterations: Iterations per run.
-        opt_digits: Decimal precision for optimization (-1 for double).
-        hash_digits: Decimal precision for solution hashing.
+        fitness_precision: Decimal precision for fitness values (-1 for full double).
+        coordinate_precision: Decimal precision for coordinate hashing (-1 for no rounding).
         bounded: Whether to enforce domain bounds.
 
     Returns:
