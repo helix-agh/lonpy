@@ -106,38 +106,10 @@ class LON:
         visit_counts = lnodes.groupby("Node").size().reset_index(name="Count")
 
         duplicates = node_agg[node_agg["Fitness_nunique"] > 1]
+
+        # Check for duplication issues, raise errors or warning according to config
         if not duplicates.empty:
-            max_deviation = (node_agg["Fitness_max"] - node_agg["Fitness_min"]).max()
-
-            if (
-                config.max_fitness_deviation is not None
-                and max_deviation > config.max_fitness_deviation
-            ):
-                raise ValueError(
-                    f"Fitness deviation ({max_deviation:.6f}) exceeds maximum allowed "
-                    f"threshold ({config.max_fitness_deviation:.6f}). "
-                    f"Found {len(duplicates)} node(s) with multiple fitness values. "
-                    f"This may indicate data quality issues."
-                )
-
-            if config.fitness_aggregation == "strict":
-                raise ValueError(
-                    f"Detected {len(duplicates)} node(s) with multiple fitness values "
-                    f"(max deviation: {max_deviation:.6f}) in strict mode. "
-                    f"Strict mode requires each node to have a unique fitness value. "
-                    f"Consider using a different fitness_aggregation strategy or "
-                    f"adjusting coordinate_precision/fitness_precision."
-                )
-
-            if config.warn_on_duplicates:
-                warnings.warn(
-                    f"Detected {len(duplicates)} node(s) with multiple fitness values "
-                    f"(max deviation: {max_deviation:.6f}). "
-                    f"Using '{config.fitness_aggregation}' fitness for each node. "
-                    f"This may indicate numerical precision issues or noisy fitness evaluation.",
-                    category=UserWarning,
-                    stacklevel=2,
-                )
+            _validate_duplicate_nodes(node_agg, duplicates, config)
 
         match config.fitness_aggregation:
             case "first":
@@ -639,6 +611,53 @@ def _contract_vertices(
         new_graph.es["Count"] = counts
 
     return new_graph
+
+
+def _validate_duplicate_nodes(
+    node_agg: pd.DataFrame,
+    duplicates: pd.DataFrame,
+    config: LONConfig,
+) -> None:
+    """
+    Validate and warn about nodes that appear with more than one fitness value.
+
+    Args:
+        node_agg: Aggregated node DataFrame (columns: Node, Fitness_min, Fitness_max, …).
+        duplicates: Subset of node_agg where Fitness_nunique > 1.
+        config: LON construction configuration.
+
+    Raises:
+        ValueError: If max_fitness_deviation threshold is exceeded, or if
+            fitness_aggregation is "strict".
+    """
+    max_deviation = (node_agg["Fitness_max"] - node_agg["Fitness_min"]).max()
+
+    if config.max_fitness_deviation is not None and max_deviation > config.max_fitness_deviation:
+        raise ValueError(
+            f"Fitness deviation ({max_deviation:.6f}) exceeds maximum allowed "
+            f"threshold ({config.max_fitness_deviation:.6f}). "
+            f"Found {len(duplicates)} node(s) with multiple fitness values. "
+            f"This may indicate data quality issues."
+        )
+
+    if config.fitness_aggregation == "strict":
+        raise ValueError(
+            f"Detected {len(duplicates)} node(s) with multiple fitness values "
+            f"(max deviation: {max_deviation:.6f}) in strict mode. "
+            f"Strict mode requires each node to have a unique fitness value. "
+            f"Consider using a different fitness_aggregation strategy or "
+            f"adjusting coordinate_precision/fitness_precision."
+        )
+
+    if config.warn_on_duplicates:
+        warnings.warn(
+            f"Detected {len(duplicates)} node(s) with multiple fitness values "
+            f"(max deviation: {max_deviation:.6f}). "
+            f"Using '{config.fitness_aggregation}' fitness for each node. "
+            f"This may indicate numerical precision issues or noisy fitness evaluation.",
+            category=UserWarning,
+            stacklevel=3,
+        )
 
 
 def _simplify_with_edge_sum(graph: ig.Graph) -> ig.Graph:
