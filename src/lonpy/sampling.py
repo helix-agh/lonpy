@@ -96,13 +96,14 @@ class BasinHoppingSampler:
 
         Args:
             x: Solution coordinates.
-            fitness: Fitness value (unused, kept for API compatibility).
 
         Returns:
             Hash string identifying the local optimum.
         """
 
-        x += 0.0  # Convert -0.0 to 0.0 for consistent hashing
+        x = (
+            x + 0.0
+        )  # Convert -0.0 to 0.0 for consistent hashing (avoids in-place mutation of input)
 
         precision = self.config.coordinate_precision
         formatter = str if precision is None or precision < 0 else lambda v: f"{v:.{precision}f}"
