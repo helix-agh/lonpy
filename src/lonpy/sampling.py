@@ -128,7 +128,7 @@ class BasinHoppingSampler:
 
     def _basin_hopping_sampling(
         self,
-        func: Callable[[Sequence], float],
+        func: Callable[[np.ndarray], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> list[dict]:
@@ -267,7 +267,7 @@ class BasinHoppingSampler:
 
     def sample(
         self,
-        func: Callable[[Sequence], float],
+        func: Callable[[np.ndarray], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> tuple[pd.DataFrame, list[dict]]:
@@ -294,7 +294,7 @@ class BasinHoppingSampler:
 
     def sample_to_lon(
         self,
-        func: Callable[[Sequence], float],
+        func: Callable[[np.ndarray], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
     ) -> LON:
@@ -307,7 +307,7 @@ class BasinHoppingSampler:
 
 
 def compute_lon(
-    func: Callable[[Sequence], float],
+    func: Callable[[np.ndarray], float],
     dim: int,
     lower_bound: float | Sequence[float],
     upper_bound: float | Sequence[float],
