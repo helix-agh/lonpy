@@ -30,10 +30,10 @@ class BasinHoppingSamplerConfig:
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
         fitness_precision: Decimal precision for fitness values.
-            Use -1 for full double precision.
+            Use None for full double precision. Passing negative values behaves the same as passing None.
         coordinate_precision: Decimal precision for coordinate rounding and hashing.
             Solutions rounded to this precision are considered identical.
-            Use -1 for full double precision (no rounding).
+            Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
         bounded: Whether to enforce domain bounds during perturbation.
         minimizer_method: Scipy minimizer method (default: "L-BFGS-B").
         minimizer_options: Options passed to scipy.optimize.minimize.
@@ -44,8 +44,8 @@ class BasinHoppingSamplerConfig:
     n_iterations: int = 1000
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
-    fitness_precision: int = -1
-    coordinate_precision: int = 5
+    fitness_precision: int | None = None
+    coordinate_precision: int | None = 5
     bounded: bool = True
     minimizer_method: str = "L-BFGS-B"
     minimizer_options: dict = field(
@@ -82,8 +82,8 @@ class BasinHoppingSampler:
             return np.clip(y, bounds[:, 0], bounds[:, 1])
         return y
 
-    def _round_value(self, value: np.ndarray, precision: int) -> np.ndarray:
-        if precision < 0:
+    def _round_value(self, value: np.ndarray, precision: int | None) -> np.ndarray:
+        if precision is None or precision < 0:
             return value
         return np.round(value, precision)
 
@@ -105,7 +105,7 @@ class BasinHoppingSampler:
         x += 0.0  # Convert -0.0 to 0.0 for consistent hashing
 
         precision = self.config.coordinate_precision
-        formatter = str if precision < 0 else lambda v: f"{v:.{precision}f}"
+        formatter = str if precision is None or precision < 0 else lambda v: f"{v:.{precision}f}"
         hash_str = "_".join(formatter(v) for v in x)
 
         return hash_str
@@ -120,7 +120,7 @@ class BasinHoppingSampler:
         Returns:
             Scaled integer fitness value.
         """
-        if self.config.fitness_precision < 0:
+        if self.config.fitness_precision is None or self.config.fitness_precision < 0:
             return int(fitness * 1e6)
         scale = 10**self.config.fitness_precision
         return int(round(fitness * scale))
@@ -315,8 +315,8 @@ def compute_lon(
     step_mode: StepMode = "percentage",
     n_runs: int = 10,
     n_iterations: int = 1000,
-    fitness_precision: int = -1,
-    coordinate_precision: int = 5,
+    fitness_precision: int | None = None,
+    coordinate_precision: int | None = 5,
     bounded: bool = True,
 ) -> LON:
     """
@@ -335,8 +335,8 @@ def compute_lon(
         step_mode: "percentage" (of domain) or "fixed".
         n_runs: Number of independent Basin-Hopping runs.
         n_iterations: Iterations per run.
-        fitness_precision: Decimal precision for fitness values (-1 for full double).
-        coordinate_precision: Decimal precision for coordinate hashing (-1 for no rounding).
+        fitness_precision: Decimal precision for fitness values (None for full double). Passing negative values behaves the same as passing None.
+        coordinate_precision: Decimal precision for coordinate hashing (None for no rounding). Passing negative values behaves the same as passing None.
         bounded: Whether to enforce domain bounds.
 
     Returns:
