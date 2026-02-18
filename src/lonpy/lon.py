@@ -247,7 +247,6 @@ class LON:
 
         if neutral_edge_indices:
             gnn = self.graph.subgraph_edges(neutral_edge_indices, delete_vertices=True)
-            gnn = gnn.simplify(multiple="sum", loops=True)
             neutral = round(gnn.vcount() / n_optima, 4)
         else:
             neutral = 0.0
