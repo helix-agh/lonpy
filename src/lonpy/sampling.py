@@ -25,7 +25,7 @@ class BasinHoppingSamplerConfig:
 
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
-        n_iterations: Number of iterations per run.
+        max_perturbations_without_improvement: Number of perturbations without improvement before stopping.
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
@@ -41,7 +41,7 @@ class BasinHoppingSamplerConfig:
     """
 
     n_runs: int = 100
-    n_iterations: int = 1000
+    max_perturbations_without_improvement: int = 1000
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     fitness_precision: int | None = None
@@ -63,7 +63,7 @@ class BasinHoppingSampler:
     transitions between local optima for LON construction.
 
     Example:
-        >>> config = BasinHoppingSamplerConfig(n_runs=10, n_iterations=1000)
+        >>> config = BasinHoppingSamplerConfig(n_runs=10, max_perturbations_without_improvement=1000)
         >>> sampler = BasinHoppingSampler(config)
         >>> lon = sampler.sample_to_lon(objective_func, domain)
     """
@@ -179,10 +179,13 @@ class BasinHoppingSampler:
             current_x = res.x
             current_f = res.fun
 
-            runs_without_improvement = 0
+            perturbations_without_improvement = 0
             run_index = 0
 
-            while runs_without_improvement < self.config.n_iterations:
+            while (
+                perturbations_without_improvement
+                < self.config.max_perturbations_without_improvement
+            ):
                 x_perturbed = self._perturbation(current_x, p, bounds_array)
                 res = minimize(
                     func,
@@ -208,9 +211,9 @@ class BasinHoppingSampler:
                 )
 
                 if new_f < current_f:
-                    runs_without_improvement = 0
+                    perturbations_without_improvement = 0
                 else:
-                    runs_without_improvement += 1
+                    perturbations_without_improvement += 1
 
                 # Acceptance criterion (minimization: accept if better or equal)
                 if new_f <= current_f:
@@ -315,7 +318,7 @@ def compute_lon(
     step_size: float = 0.01,
     step_mode: StepMode = "percentage",
     n_runs: int = 10,
-    n_iterations: int = 1000,
+    max_perturbations_without_improvement: int = 1000,
     fitness_precision: int | None = None,
     coordinate_precision: int | None = 5,
     bounded: bool = True,
@@ -335,7 +338,7 @@ def compute_lon(
         step_size: Perturbation step size.
         step_mode: "percentage" (of domain) or "fixed".
         n_runs: Number of independent Basin-Hopping runs.
-        n_iterations: Iterations per run.
+        max_perturbations_without_improvement: Maximum number of consecutive non-improving perturbations before stopping each run.
         fitness_precision: Decimal precision for fitness values (None for full double). Passing negative values behaves the same as passing None.
         coordinate_precision: Decimal precision for coordinate hashing (None for no rounding). Passing negative values behaves the same as passing None.
         bounded: Whether to enforce domain bounds.
@@ -362,7 +365,7 @@ def compute_lon(
 
     config = BasinHoppingSamplerConfig(
         n_runs=n_runs,
-        n_iterations=n_iterations,
+        max_perturbations_without_improvement=max_perturbations_without_improvement,
         step_mode=step_mode,
         step_size=step_size,
         fitness_precision=fitness_precision,
