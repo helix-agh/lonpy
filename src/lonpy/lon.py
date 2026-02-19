@@ -184,12 +184,17 @@ class LON:
         """List of vertex counts (times visited)."""
         return list(self.graph.vs["Count"])
 
-    def _float_eq(self, f1: float | None, f2: float | None) -> bool:
+    def _allclose(self, f1: float | None, f2: float | None) -> bool:
         """Check if two fitness values are equal within tolerance."""
         if f1 is None or f2 is None:
             return f1 == f2
         atol = self.eq_atol if self.eq_atol is not None else DEFAULT_ATOL
         return np.allclose(f1, f2, atol=atol, rtol=0.0)
+
+    def _isclose_series(self, f1: pd.Series, f2: float):
+        """Check element-wise if a Series of fitness values are equal to a scalar within tolerance."""
+        atol = self.eq_atol if self.eq_atol is not None else DEFAULT_ATOL
+        return np.isclose(f1, f2, atol=atol, rtol=0.0)
 
     def get_sinks(self) -> list[int]:
         """Get indices of sink nodes (nodes with no outgoing edges)."""
@@ -199,7 +204,7 @@ class LON:
     def get_global_optima_indices(self) -> list[int]:
         """Get indices of global optima nodes (nodes at best fitness)."""
         return [
-            i for i, f in enumerate(self.vertex_fitness) if self._float_eq(f, self.best_fitness)
+            i for i, f in enumerate(self.vertex_fitness) if self._allclose(f, self.best_fitness)
         ]
 
     def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
@@ -226,14 +231,14 @@ class LON:
         n_funnels = len(sinks_id)
 
         sinks_fit = [self.vertex_fitness[i] for i in sinks_id]
-        n_global_funnels = sum(1 for f in sinks_fit if self._float_eq(f, best))
+        n_global_funnels = sum(1 for f in sinks_fit if self._allclose(f, best))
 
         # Neutral: proportion of nodes with equal-fitness connections
         el = self.graph.get_edgelist()
         fits = self.vertex_fitness
         neutral_edge_indices = []
         for i, (src, tgt) in enumerate(el):
-            if self._float_eq(fits[src], fits[tgt]):
+            if self._allclose(fits[src], fits[tgt]):
                 neutral_edge_indices.append(i)
 
         if neutral_edge_indices:
@@ -276,8 +281,8 @@ class LON:
         best = known_best if known_best is not None else self.best_fitness
         # Success: proportion of runs that reached the global optimum
         success = (
-            (self.final_run_values == best).sum() / len(self.final_run_values)
-            if self.final_run_values is not None
+            self._isclose_series(self.final_run_values, best).sum() / len(self.final_run_values)
+            if self.final_run_values is not None and best is not None
             else 0.0
         )
 
@@ -382,7 +387,7 @@ class CMLON:
         for i, (fit1, fit2) in enumerate(zip(f1, f2)):
             if fit2 < fit1:
                 edge_types.append("improving")
-            elif lon._float_eq(fit2, fit1):
+            elif lon._allclose(fit2, fit1):
                 edge_types.append("equal")
                 equal_edge_indices.append(i)
             else:
@@ -412,7 +417,7 @@ class CMLON:
             eq_atol=lon.eq_atol,
         )
 
-    def _float_eq(self, f1: float | None, f2: float | None) -> bool:
+    def _allclose(self, f1: float | None, f2: float | None) -> bool:
         """Check if two fitness values are equal within tolerance."""
         if f1 is None or f2 is None:
             return f1 == f2
@@ -448,7 +453,7 @@ class CMLON:
         """Get indices of global sinks (sinks at best fitness)."""
         sinks = self.get_sinks()
         fits = self.vertex_fitness
-        return [s for s in sinks if self._float_eq(fits[s], self.best_fitness)]
+        return [s for s in sinks if self._allclose(fits[s], self.best_fitness)]
 
     def get_local_sinks(self) -> list[int]:
         """Get indices of local sinks (sinks not at best fitness)."""
@@ -484,7 +489,7 @@ class CMLON:
         n_funnels = len(sinks_id)
 
         sinks_fit = [self.vertex_fitness[i] for i in sinks_id]
-        n_global_funnels = sum(1 for f in sinks_fit if self._float_eq(f, best))
+        n_global_funnels = sum(1 for f in sinks_fit if self._allclose(f, best))
 
         # Neutral: proportion of contracted nodes
         if self.source_lon is not None:
@@ -493,7 +498,7 @@ class CMLON:
             neutral = 0.0
 
         # Strength: normalised ratio of incoming strength to global
-        igs = [s for s, f in zip(sinks_id, sinks_fit) if self._float_eq(f, best)]
+        igs = [s for s, f in zip(sinks_id, sinks_fit) if self._allclose(f, best)]
 
         if self.n_edges > 0:
             edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
