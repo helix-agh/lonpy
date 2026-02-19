@@ -1,12 +1,12 @@
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from lonpy.lon import LON
+from lonpy.lon import LON, LONConfig
 
 StepMode = Literal["percentage", "fixed"]
 
@@ -300,13 +300,21 @@ class BasinHoppingSampler:
         func: Callable[[np.ndarray], float],
         domain: list[tuple[float, float]],
         progress_callback: Callable[[int, int], None] | None = None,
+        lon_config: LONConfig | None = None,
     ) -> LON:
         trace_df, _ = self.sample(func, domain, progress_callback)
 
         if trace_df.empty:
             return LON()
 
-        return LON.from_trace_data(trace_df)
+        _lon_config = replace(lon_config) if lon_config is not None else LONConfig()
+
+        if _lon_config.eq_atol is None:
+            p = self.config.fitness_precision
+            if p is not None and p >= 0:
+                _lon_config.eq_atol = 10 ** -(p + 1)
+
+        return LON.from_trace_data(trace_df, config=_lon_config)
 
 
 def compute_lon(
@@ -322,6 +330,7 @@ def compute_lon(
     fitness_precision: int | None = None,
     coordinate_precision: int | None = 5,
     bounded: bool = True,
+    lon_config: LONConfig | None = None,
 ) -> LON:
     """
     Compute a LON from an objective function.
@@ -375,4 +384,4 @@ def compute_lon(
     )
 
     sampler = BasinHoppingSampler(config)
-    return sampler.sample_to_lon(func, domain)
+    return sampler.sample_to_lon(func, domain, lon_config=lon_config)
