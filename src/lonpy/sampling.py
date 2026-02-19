@@ -111,21 +111,6 @@ class BasinHoppingSampler:
 
         return hash_str
 
-    def _fitness_to_int(self, fitness: float) -> int:
-        """
-        Convert fitness to integer representation for storage.
-
-        Args:
-            fitness: Floating-point fitness value.
-
-        Returns:
-            Scaled integer fitness value.
-        """
-        if self.config.fitness_precision is None or self.config.fitness_precision < 0:
-            return int(fitness * 1e6)
-        scale = 10**self.config.fitness_precision
-        return int(round(fitness * scale))
-
     def _basin_hopping_sampling(
         self,
         func: Callable[[np.ndarray], float],
@@ -141,10 +126,9 @@ class BasinHoppingSampler:
             progress_callback: Optional callback(run, total_runs) for progress.
 
         Returns:
-            Tuple of (trace_df, raw_records):
-                - trace_df: DataFrame with columns [run, fit1, node1, fit2, node2]
-                  ready for LON construction.
-                - raw_records: List of dicts with detailed iteration data.
+            List of raw sampling records, one per perturbation step.
+            Each record is a dict with keys: run, iteration, current_x,
+            current_f, new_x, new_f, accepted.
         """
         if self.config.seed is not None:
             np.random.seed(self.config.seed)
