@@ -7,14 +7,12 @@ def griewank(x: np.ndarray) -> float:
     return float(np.sum(x**2 / 4000.0) - np.prod(np.cos(x / np.sqrt(i))) + 1.0)
 
 
-def schwefel2_26(x: np.ndarray):
-    f = 0.0
-    for i in range(len(x)):
-        f += x[i] * np.sin(np.sqrt(abs(x[i])))
-    return -f
+def schwefel2_26(x: np.ndarray) -> float:
+    x = np.asarray(x, dtype=float)
+    return float(-np.sum(x * np.sin(np.sqrt(np.abs(x)))))
 
 
-def ackley4(x: np.ndarray):
+def ackley4(x: np.ndarray) -> float:
     f = 0.0
     for i in range(len(x) - 1):
         f += np.exp(-0.2) * np.sqrt(x[i] ** 2 + x[i + 1] ** 2) + 3 * (

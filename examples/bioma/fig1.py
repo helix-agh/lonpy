@@ -6,6 +6,8 @@ from problems import (
     schwefel2_26,
 )
 
+IMAGES_DIR = "images"
+
 FUNCTIONS = {
     "Ackley4": {
         "func": ackley4,
@@ -55,8 +57,11 @@ def plot_all_surfaces(save: bool = True) -> None:
     plt.tight_layout()
 
     if save:
-        fig.savefig("fig1.png", dpi=150, bbox_inches="tight")
-        print("Saved fig1.png")
+        from pathlib import Path
+
+        Path(IMAGES_DIR).mkdir(parents=True, exist_ok=True)
+        fig.savefig(f"{IMAGES_DIR}/fig1.png", dpi=150, bbox_inches="tight")
+        print(f"Saved {IMAGES_DIR}/fig1.png")
 
     plt.show()
 
