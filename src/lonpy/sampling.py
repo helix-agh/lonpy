@@ -69,7 +69,8 @@ class BasinHoppingSampler:
     ) -> np.ndarray:
         y = x + np.random.uniform(low=-p, high=p)
         bounds = np.array(domain)
-        return np.clip(y, bounds[:, 0], bounds[:, 1])
+        eps = 1e-10
+        return np.clip(y, bounds[:, 0] + eps, bounds[:, 1] - eps)
 
     def unbounded_perturbation(self, x: np.ndarray, p: np.ndarray) -> np.ndarray:
         return x + np.random.uniform(low=-p, high=p)
@@ -163,6 +164,8 @@ class BasinHoppingSampler:
                     options=self.config.minimizer_options,
                     bounds=bounds,
                 )
+                bounds_arr = np.array(domain)
+                res.x = np.clip(res.x, bounds_arr[:, 0], bounds_arr[:, 1])
             else:
                 res = minimize(
                     func,
@@ -188,6 +191,8 @@ class BasinHoppingSampler:
                         bounds=bounds,
                         options=self.config.minimizer_options,
                     )
+                    eps = 1e-10
+                    res.x = np.clip(res.x, bounds_arr[:, 0] + eps, bounds_arr[:, 1] - eps)
                 else:
                     x_perturbed = self.unbounded_perturbation(current_x, p)
                     res = minimize(
