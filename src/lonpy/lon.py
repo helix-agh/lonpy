@@ -1,9 +1,37 @@
 import contextlib
+import warnings
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import igraph as ig
+import numpy as np
 import pandas as pd
+
+DEFAULT_ATOL = 1e-12
+
+
+@dataclass
+class LONConfig:
+    """
+    Configuration for LON construction from trace data.
+
+    Attributes:
+        fitness_aggregation: Strategy for handling nodes with multiple fitness values:
+            - "min": Use minimum fitness
+            - "max": Use maximum fitness
+            - "mean": Use average fitness
+            - "first": Use first occurrence
+            - "strict": Raise error if duplicates are detected
+            Default: "min".
+        warn_on_duplicates: Whether to emit a warning when duplicate nodes detected. Default: `True`
+        max_fitness_deviation: If set, raise error if fitness deviation exceeds this threshold. Default: `None` (no threshold).
+            Useful for detecting data quality issues.
+    """
+
+    fitness_aggregation: Literal["min", "max", "mean", "first", "strict"] = "min"
+    warn_on_duplicates: bool = True
+    max_fitness_deviation: float | None = None
+    eq_atol: float | None = None
 
 
 @dataclass
@@ -17,15 +45,19 @@ class LON:
     Attributes:
         graph: The underlying igraph Graph object.
         best_fitness: The best (minimum) fitness value found.
+        final_run_values: Dictionary mapping run number to final fitness value.
     """
 
     graph: ig.Graph = field(default_factory=lambda: ig.Graph(directed=True))
     best_fitness: float | None = None
+    final_run_values: pd.Series | None = None
+    eq_atol: float | None = None
 
     @classmethod
     def from_trace_data(
         cls,
         trace: pd.DataFrame,
+        config: LONConfig | None = None,
     ) -> "LON":
         """
         Create a LON from trace data.
@@ -37,25 +69,73 @@ class LON:
                 - node1: string hash of source node
                 - fit2: integer fitness of target node (scaled)
                 - node2: string hash of target node
+            config: Optional configuration for LON construction. If None, uses default
+                configuration with minimum fitness aggregation.
 
         Returns:
             LON instance with constructed graph.
+
+        Raises:
+            ValueError: If fitness_aggregation is "strict" and duplicates are detected,
+                or if max_fitness_deviation threshold is exceeded.
         """
+        config = config or LONConfig()
         trace = trace.copy()
         trace.columns = pd.Index(["run", "fit1", "node1", "fit2", "node2"])
 
-        # Combine nodes from both columns
-        lnodes1 = trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"})
-        lnodes2 = trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"})
-        lnodes = pd.concat([lnodes1, lnodes2], ignore_index=True)
+        # Extract final fitness value from each run as a Series
+        final_run_values = trace.groupby("run").tail(1).set_index("run")["fit2"]
 
-        ledges = trace[["node1", "node2"]].copy()
+        lnodes = pd.concat(
+            [
+                trace[["node1", "fit1"]].rename(columns={"node1": "Node", "fit1": "Fitness"}),
+                trace[["node2", "fit2"]].rename(columns={"node2": "Node", "fit2": "Fitness"}),
+            ],
+            ignore_index=True,
+        )
 
-        # Count node and edge occurrences
-        nodes = lnodes.groupby(["Node", "Fitness"], as_index=False).size()
-        nodes.columns = pd.Index(["Node", "Fitness", "Count"])
+        # Node deduplication by grouping and aggregation
+        node_agg = (
+            lnodes.groupby("Node").agg({"Fitness": ["min", "max", "mean", "nunique"]}).reset_index()
+        )
+        node_agg.columns = pd.Index(
+            [
+                "Node",
+                "Fitness_min",
+                "Fitness_max",
+                "Fitness_mean",
+                "Fitness_nunique",
+            ]
+        )
 
-        edges = ledges.groupby(["node1", "node2"], as_index=False).size()
+        visit_counts = lnodes.groupby("Node").size().reset_index(name="Count")
+
+        duplicates = node_agg[node_agg["Fitness_nunique"] > 1]
+
+        # Check for duplication issues, raise errors or warning according to config
+        if not duplicates.empty:
+            _validate_duplicate_nodes(node_agg, duplicates, config)
+
+        match config.fitness_aggregation:
+            case "first":
+                fitness_values = lnodes.groupby("Node", as_index=False).first()[["Node", "Fitness"]]
+            case "max":
+                fitness_values = node_agg[["Node", "Fitness_max"]].rename(
+                    columns={"Fitness_max": "Fitness"}
+                )
+            case "mean":
+                fitness_values = node_agg[["Node", "Fitness_mean"]].rename(
+                    columns={"Fitness_mean": "Fitness"}
+                )
+            case _:  # "min" or default
+                fitness_values = node_agg[["Node", "Fitness_min"]].rename(
+                    columns={"Fitness_min": "Fitness"}
+                )
+
+        # Merge fitness values with visit counts
+        nodes = pd.merge(fitness_values, visit_counts, on="Node")
+
+        edges = trace.groupby(["node1", "node2"], as_index=False).size()
         edges.columns = pd.Index(["Start", "End", "Count"])
 
         graph = ig.Graph(directed=True)
@@ -72,7 +152,12 @@ class LON:
 
         best = nodes["Fitness"].min()
 
-        return cls(graph=graph, best_fitness=best)
+        return cls(
+            graph=graph,
+            best_fitness=best,
+            final_run_values=final_run_values,
+            eq_atol=config.eq_atol,
+        )
 
     @property
     def n_vertices(self) -> int:
@@ -99,6 +184,18 @@ class LON:
         """List of vertex counts (times visited)."""
         return list(self.graph.vs["Count"])
 
+    def _allclose(self, f1: float | None, f2: float | None) -> bool:
+        """Check if two fitness values are equal within tolerance."""
+        if f1 is None or f2 is None:
+            return f1 == f2
+        atol = self.eq_atol if self.eq_atol is not None else DEFAULT_ATOL
+        return np.allclose(f1, f2, atol=atol, rtol=0.0)
+
+    def _isclose_series(self, f1: pd.Series, f2: float):
+        """Check element-wise if a Series of fitness values are equal to a scalar within tolerance."""
+        atol = self.eq_atol if self.eq_atol is not None else DEFAULT_ATOL
+        return np.isclose(f1, f2, atol=atol, rtol=0.0)
+
     def get_sinks(self) -> list[int]:
         """Get indices of sink nodes (nodes with no outgoing edges)."""
         out_degrees = self.graph.degree(mode="out")
@@ -106,9 +203,11 @@ class LON:
 
     def get_global_optima_indices(self) -> list[int]:
         """Get indices of global optima nodes (nodes at best fitness)."""
-        return [i for i, f in enumerate(self.vertex_fitness) if f == self.best_fitness]
+        return [
+            i for i, f in enumerate(self.vertex_fitness) if self._allclose(f, self.best_fitness)
+        ]
 
-    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+    def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
         Compute LON metrics.
 
@@ -132,19 +231,18 @@ class LON:
         n_funnels = len(sinks_id)
 
         sinks_fit = [self.vertex_fitness[i] for i in sinks_id]
-        n_global_funnels = sum(1 for f in sinks_fit if f == best)
+        n_global_funnels = sum(1 for f in sinks_fit if self._allclose(f, best))
 
         # Neutral: proportion of nodes with equal-fitness connections
         el = self.graph.get_edgelist()
         fits = self.vertex_fitness
         neutral_edge_indices = []
         for i, (src, tgt) in enumerate(el):
-            if fits[src] == fits[tgt]:
+            if self._allclose(fits[src], fits[tgt]):
                 neutral_edge_indices.append(i)
 
         if neutral_edge_indices:
             gnn = self.graph.subgraph_edges(neutral_edge_indices, delete_vertices=True)
-            gnn = gnn.simplify(multiple=False, loops=True)
             neutral = round(gnn.vcount() / n_optima, 4)
         else:
             neutral = 0.0
@@ -166,6 +264,56 @@ class LON:
             "neutral": neutral,
             "strength": strength,
         }
+
+    def compute_performance_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute performance metrics based on sampling runs.
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing:
+                - success: Proportion of runs that reached the global optimum
+                - deviation: Mean absolute deviation from the global optimum
+        """
+        best = known_best if known_best is not None else self.best_fitness
+        # Success: proportion of runs that reached the global optimum
+        success = (
+            self._isclose_series(self.final_run_values, best).sum() / len(self.final_run_values)
+            if self.final_run_values is not None and best is not None
+            else 0.0
+        )
+
+        # Deviation: mean deviation from the global optimum value
+        deviation = (
+            (self.final_run_values - best).abs().mean()
+            if self.final_run_values is not None and best is not None
+            else 0.0
+        )
+
+        return {"success": success, "deviation": deviation}
+
+    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute all LON metrics (network topology + performance).
+
+        This is a convenience method that combines both network metrics
+        (topology-based) and performance metrics (run-based).
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing all network and performance metrics:
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, strength
+                Performance metrics: success, deviation
+        """
+        network_metrics = self.compute_network_metrics(known_best)
+        performance_metrics = self.compute_performance_metrics(known_best)
+        return {**network_metrics, **performance_metrics}
 
     def to_cmlon(self) -> "CMLON":
         """
@@ -194,6 +342,7 @@ class CMLON:
     graph: ig.Graph = field(default_factory=lambda: ig.Graph(directed=True))
     best_fitness: float | None = None
     source_lon: LON | None = None
+    eq_atol: float | None = None
 
     @classmethod
     def from_lon(cls, lon: LON) -> "CMLON":
@@ -215,7 +364,12 @@ class CMLON:
         """
         if lon.n_edges == 0:
             cmlon_graph = lon.graph.copy()
-            return cls(graph=cmlon_graph, best_fitness=lon.best_fitness, source_lon=lon)
+            return cls(
+                graph=cmlon_graph,
+                best_fitness=lon.best_fitness,
+                source_lon=lon,
+                eq_atol=lon.eq_atol,
+            )
 
         # Create a working copy
         mlon = lon.graph.copy()
@@ -233,7 +387,7 @@ class CMLON:
         for i, (fit1, fit2) in enumerate(zip(f1, f2)):
             if fit2 < fit1:
                 edge_types.append("improving")
-            elif fit2 == fit1:
+            elif lon._allclose(fit2, fit1):
                 edge_types.append("equal")
                 equal_edge_indices.append(i)
             else:
@@ -256,10 +410,19 @@ class CMLON:
             vertex_attr_comb={"Fitness": "first", "Count": "sum", "name": "first"},
         )
 
-        # Combine parallel edges by summing Count
-        cmlon_graph = _simplify_with_edge_sum(cmlon_graph)
+        return cls(
+            graph=cmlon_graph,
+            best_fitness=lon.best_fitness,
+            source_lon=lon,
+            eq_atol=lon.eq_atol,
+        )
 
-        return cls(graph=cmlon_graph, best_fitness=lon.best_fitness, source_lon=lon)
+    def _allclose(self, f1: float | None, f2: float | None) -> bool:
+        """Check if two fitness values are equal within tolerance."""
+        if f1 is None or f2 is None:
+            return f1 == f2
+        atol = self.eq_atol if self.eq_atol is not None else DEFAULT_ATOL
+        return np.allclose(f1, f2, atol=atol, rtol=0.0)
 
     @property
     def n_vertices(self) -> int:
@@ -290,7 +453,7 @@ class CMLON:
         """Get indices of global sinks (sinks at best fitness)."""
         sinks = self.get_sinks()
         fits = self.vertex_fitness
-        return [s for s in sinks if fits[s] == self.best_fitness]
+        return [s for s in sinks if self._allclose(fits[s], self.best_fitness)]
 
     def get_local_sinks(self) -> list[int]:
         """Get indices of local sinks (sinks not at best fitness)."""
@@ -300,7 +463,7 @@ class CMLON:
             return []
         return [s for s in sinks if fits[s] > self.best_fitness]
 
-    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+    def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
         Compute CMLON metrics.
 
@@ -326,7 +489,7 @@ class CMLON:
         n_funnels = len(sinks_id)
 
         sinks_fit = [self.vertex_fitness[i] for i in sinks_id]
-        n_global_funnels = sum(1 for f in sinks_fit if f == best)
+        n_global_funnels = sum(1 for f in sinks_fit if self._allclose(f, best))
 
         # Neutral: proportion of contracted nodes
         if self.source_lon is not None:
@@ -334,9 +497,8 @@ class CMLON:
         else:
             neutral = 0.0
 
-        # Strength: ratio of incoming strength to global vs local sinks
-        igs = [s for s, f in zip(sinks_id, sinks_fit) if f == best]
-        ils = [s for s, f in zip(sinks_id, sinks_fit) if best is not None and f > best]
+        # Strength: normalised ratio of incoming strength to global
+        igs = [s for s, f in zip(sinks_id, sinks_fit) if self._allclose(f, best)]
 
         if self.n_edges > 0:
             edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
@@ -345,12 +507,7 @@ class CMLON:
                 if igs
                 else 0
             )
-            sinl = (
-                sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights))
-                if ils
-                else 0
-            )
-            total = sing + sinl
+            total = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
             strength = round(sing / total, 4) if total > 0 else 0.0
         else:
             strength = 0.0
@@ -379,6 +536,48 @@ class CMLON:
             reachable.update(component)
 
         return len(reachable) / self.n_vertices if self.n_vertices > 0 else 0.0
+
+    def compute_performance_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute performance metrics from the source LON.
+
+        CMLON delegates to its source LON for performance metrics since
+        it doesn't have its own sampling run data.
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing performance metrics from source LON, or
+            empty dict if no source LON is available.
+        """
+        return (
+            self.source_lon.compute_performance_metrics(known_best)
+            if self.source_lon is not None
+            else {}
+        )
+
+    def compute_metrics(self, known_best: float | None = None) -> dict[str, Any]:
+        """
+        Compute all CMLON metrics (network topology + performance).
+
+        This is a convenience method that combines both CMLON-specific network
+        metrics and performance metrics from the source LON.
+
+        Args:
+            known_best: Known global optimum value. If None, uses the best
+                fitness found in the network.
+
+        Returns:
+            Dictionary containing all network and performance metrics:
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral,
+                    strength, global_funnel_proportion
+                Performance metrics: success, deviation (from source LON)
+        """
+        network_metrics = self.compute_network_metrics(known_best)
+        performance_metrics = self.compute_performance_metrics(known_best)
+        return {**network_metrics, **performance_metrics}
 
 
 def _contract_vertices(
@@ -454,6 +653,53 @@ def _contract_vertices(
         new_graph.es["Count"] = counts
 
     return new_graph
+
+
+def _validate_duplicate_nodes(
+    node_agg: pd.DataFrame,
+    duplicates: pd.DataFrame,
+    config: LONConfig,
+) -> None:
+    """
+    Validate and warn about nodes that appear with more than one fitness value.
+
+    Args:
+        node_agg: Aggregated node DataFrame (columns: Node, Fitness_min, Fitness_max, …).
+        duplicates: Subset of node_agg where Fitness_nunique > 1.
+        config: LON construction configuration.
+
+    Raises:
+        ValueError: If max_fitness_deviation threshold is exceeded, or if
+            fitness_aggregation is "strict".
+    """
+    max_deviation = (node_agg["Fitness_max"] - node_agg["Fitness_min"]).max()
+
+    if config.max_fitness_deviation is not None and max_deviation > config.max_fitness_deviation:
+        raise ValueError(
+            f"Fitness deviation ({max_deviation:.6f}) exceeds maximum allowed "
+            f"threshold ({config.max_fitness_deviation:.6f}). "
+            f"Found {len(duplicates)} node(s) with multiple fitness values. "
+            f"This may indicate data quality issues."
+        )
+
+    if config.fitness_aggregation == "strict":
+        raise ValueError(
+            f"Detected {len(duplicates)} node(s) with multiple fitness values "
+            f"(max deviation: {max_deviation:.6f}) in strict mode. "
+            f"Strict mode requires each node to have a unique fitness value. "
+            f"Consider using a different fitness_aggregation strategy or "
+            f"adjusting coordinate_precision/fitness_precision."
+        )
+
+    if config.warn_on_duplicates:
+        warnings.warn(
+            f"Detected {len(duplicates)} node(s) with multiple fitness values "
+            f"(max deviation: {max_deviation:.6f}). "
+            f"Using '{config.fitness_aggregation}' fitness for each node. "
+            f"This may indicate numerical precision issues or noisy fitness evaluation.",
+            category=UserWarning,
+            stacklevel=3,
+        )
 
 
 def _simplify_with_edge_sum(graph: ig.Graph) -> ig.Graph:
