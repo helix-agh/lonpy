@@ -58,7 +58,6 @@ def build_cmlon(
     lon = sampler.sample_to_lon(
         func_cfg.func,
         domain,
-        progress_callback=lambda r, t: print(f"  run {r}/{t}", end="\r"),
     )
     return lon.to_cmlon()
 
