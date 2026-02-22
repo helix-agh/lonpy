@@ -82,7 +82,7 @@ from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 
 config = BasinHoppingSamplerConfig(
     n_runs=50,                                  # Number of independent runs
-    max_perturbations_without_improvement=1000, # Stop after this many non-improving perturbations
+    max_perturbations_without_improvement=1000, # Stop after this many consecutive non-improving perturbations
     step_size=0.05,                             # Perturbation size
     step_mode="percentage",                     # "percentage" or "fixed"
     coordinate_precision=4,                     # Precision for identifying optima
