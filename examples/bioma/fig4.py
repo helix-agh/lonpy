@@ -11,19 +11,19 @@ FUNCTIONS = {
         func=ackley4,
         bounds=(-35, 35),
         step_size=1.631,
-        n_iterations=300,
+        max_perturbations_without_improvement=300,
     ),
     "Griewank": FunctionConfig(
         func=griewank,
         bounds=(-200, 200),
         step_size=3.6,
-        n_iterations=200,
+        max_perturbations_without_improvement=200,
     ),
     "Schwefel 2.26": FunctionConfig(
         func=schwefel2_26,
         bounds=(-500, 500),
         step_size=151.0,
-        n_iterations=4000,
+        max_perturbations_without_improvement=4000,
     ),
 }
 
@@ -73,9 +73,8 @@ def main() -> None:
         margin=dict(l=0, r=0, t=60, b=0),
     )
 
-    combined.write_image(f"{IMAGES_DIR}/fig4_cmlon_3d.png", scale=2)
-    combined.write_html(f"{IMAGES_DIR}/fig4_cmlon_3d.html")
-    print(f"Saved {IMAGES_DIR}/fig4_cmlon_3d.png and {IMAGES_DIR}/fig4_cmlon_3d.html")
+    combined.write_image(f"{IMAGES_DIR}/fig4.png", scale=2)
+    combined.write_html(f"{IMAGES_DIR}/fig4.html")
 
 
 if __name__ == "__main__":
