@@ -77,6 +77,7 @@ class BasinHoppingSampler:
 
     def __init__(self, config: BasinHoppingSamplerConfig | None = None):
         self.config = config or BasinHoppingSamplerConfig()
+        self._rng = np.random.default_rng(self.config.seed)
 
     def _generate_initial_points(self, domain_array: np.ndarray) -> np.ndarray:
         """
@@ -91,16 +92,14 @@ class BasinHoppingSampler:
         n_runs = self.config.n_runs
         n_var = domain_array.shape[0]
 
-        rng = np.random.default_rng(self.config.seed)
-
         if self.config.init_mode == "lhs":
-            sampler = LatinHypercube(d=n_var, seed=rng)
+            sampler = LatinHypercube(d=n_var, seed=self._rng)
             unit_samples = sampler.random(n=n_runs)
             return np.asarray(
                 scale(unit_samples, domain_array[:, 0], domain_array[:, 1]), dtype=float
             )
 
-        return rng.uniform(domain_array[:, 0], domain_array[:, 1], size=(n_runs, n_var))
+        return self._rng.uniform(domain_array[:, 0], domain_array[:, 1], size=(n_runs, n_var))
 
     def _perturbation(
         self,
@@ -108,7 +107,7 @@ class BasinHoppingSampler:
         p: np.ndarray,
         bounds: np.ndarray | None = None,
     ) -> np.ndarray:
-        y = x + np.random.uniform(low=-p, high=p)
+        y = x + self._rng.uniform(low=-p, high=p)
         if self.config.bounded and bounds is not None:
             return np.clip(y, bounds[:, 0], bounds[:, 1])
         return y
@@ -161,9 +160,6 @@ class BasinHoppingSampler:
             Each record is a dict with keys: run, iteration, current_x,
             current_f, new_x, new_f, accepted.
         """
-        if self.config.seed is not None:
-            np.random.seed(self.config.seed)
-
         n_var = len(domain)
         domain_array = np.array(domain)
 
