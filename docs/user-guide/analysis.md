@@ -36,7 +36,7 @@ print(f"Found {n_optima} local optima")
 
 - Higher values indicate more multimodal landscapes
 - Compare across functions to assess relative complexity
-- Depends on sampling thoroughness and hash_digits precision
+- Depends on sampling thoroughness and coordinate_precision
 
 ### n_funnels
 
@@ -97,6 +97,55 @@ print(f"Global strength: {strength:.1%}")
 - 100% = All transitions flow toward global optimum
 - Low % = Most flow diverted to suboptimal sinks
 - Key indicator of optimization difficulty
+
+## Performance Metrics
+
+In addition to network topology metrics, `compute_metrics()` returns performance metrics based on the sampling runs:
+
+### success
+
+**Proportion of sampling runs that reached the global optimum.**
+
+```python
+success = lon_metrics['success']
+print(f"Success rate: {success:.1%}")
+```
+
+**Interpretation:**
+
+- 100% = Every run found the global optimum
+- Low % = Many runs got trapped in local optima
+- Useful for comparing algorithm effectiveness across landscapes
+
+### deviation
+
+**Mean absolute deviation from the global optimum across all runs.**
+
+```python
+deviation = lon_metrics['deviation']
+print(f"Mean deviation: {deviation:.6f}")
+```
+
+**Interpretation:**
+
+- 0.0 = All runs converged to the global optimum
+- Higher values indicate runs ending far from the global optimum
+- Complements `success` by measuring "how far off" unsuccessful runs are
+
+### Separating Network and Performance Metrics
+
+You can also compute them separately:
+
+```python
+# Only network topology metrics (n_optima, n_funnels, etc.)
+network_metrics = lon.compute_network_metrics()
+
+# Only performance metrics (success, deviation)
+performance_metrics = lon.compute_performance_metrics()
+
+# Both combined (equivalent to compute_metrics())
+all_metrics = lon.compute_metrics()
+```
 
 ## CMLON-Specific Metrics
 

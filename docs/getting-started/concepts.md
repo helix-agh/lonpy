@@ -67,13 +67,16 @@ lonpy constructs LONs by:
 
 ### Node Identification
 
-Two solutions are considered the same local optimum if their coordinates match after rounding to `hash_digits` decimal places:
+Two solutions are considered the same local optimum if their coordinates match after rounding to `coordinate_precision` decimal places:
 
 ```python
-# With hash_digits=4:
-# x1 = [1.23456, 2.34567] → "1.2346_2.3457"
-# x2 = [1.23458, 2.34569] → "1.2346_2.3457"
+# With coordinate_precision=5 (default):
+# x1 = [1.234561, 2.345671] → "1.23456_2.34567"
+# x2 = [1.234564, 2.345674] → "1.23456_2.34567"
 # Same node!
+
+# With coordinate_precision=None (full double precision):
+# No rounding — only exact matches are the same node
 ```
 
 ## LON Metrics
@@ -87,6 +90,8 @@ lonpy computes several metrics to characterize fitness landscapes:
 | `n_global_funnels` | Sinks at global optimum | How many paths lead to success |
 | `neutral` | Proportion of equal-fitness connections | Landscape flatness |
 | `strength` | Incoming flow to global optima | Global optimum accessibility |
+| `success` | Proportion of runs reaching global optimum | Search algorithm effectiveness |
+| `deviation` | Mean absolute deviation from global optimum | Solution quality across runs |
 
 ### Interpreting Metrics
 

@@ -20,7 +20,7 @@ lon = compute_lon(
     lower_bound=-5.12,
     upper_bound=5.12,
     n_runs=30,
-    n_iterations=500,
+    max_perturbations_without_improvement=500,
     seed=42
 )
 
@@ -85,13 +85,13 @@ for name, (func, lb, ub, optimal) in functions.items():
         lower_bound=lb,
         upper_bound=ub,
         n_runs=30,
-        n_iterations=500,
+        max_perturbations_without_improvement=500,
         seed=42
     )
 
-    metrics = lon.compute_metrics(known_best=optimal * 10**4)  # scaled
+    metrics = lon.compute_metrics(known_best=optimal)
     cmlon = lon.to_cmlon()
-    cmlon_metrics = cmlon.compute_metrics(known_best=optimal * 10**4)
+    cmlon_metrics = cmlon.compute_metrics(known_best=optimal)
 
     results.append({
         "Function": name,
@@ -165,11 +165,11 @@ def schwefel(x):
 
 # Custom configuration for challenging function
 config = BasinHoppingSamplerConfig(
-    n_runs=100,              # More runs for coverage
-    n_iterations=300,        # Moderate depth
+    n_runs=100,                                  # More runs for coverage
+    max_perturbations_without_improvement=300,    # Moderate depth
     step_mode="percentage",
-    step_size=0.15,          # Larger steps for this landscape
-    hash_digits=3,           # Coarser grouping
+    step_size=0.15,                              # Larger steps for this landscape
+    coordinate_precision=3,                      # Coarser grouping
     bounded=True,
     minimizer_method="L-BFGS-B",
     minimizer_options={
@@ -209,7 +209,7 @@ from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 def sphere(x):
     return np.sum(x**2)
 
-config = BasinHoppingSamplerConfig(n_runs=5, n_iterations=100, seed=42)
+config = BasinHoppingSamplerConfig(n_runs=5, max_perturbations_without_improvement=100, seed=42)
 sampler = BasinHoppingSampler(config)
 
 domain = [(-5.0, 5.0), (-5.0, 5.0)]
@@ -290,7 +290,7 @@ def analyze_function(name, func, bounds, output_dir):
         lower_bound=bounds[0],
         upper_bound=bounds[1],
         n_runs=30,
-        n_iterations=500,
+        max_perturbations_without_improvement=500,
         seed=42
     )
 
