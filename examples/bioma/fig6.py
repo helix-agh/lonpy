@@ -58,7 +58,7 @@ def main() -> None:
 
     save_individual_figures(results, images_dir)
     save_network_grid(results, FUNCTIONS, images_dir / "fig6.png")
-    save_metrics_figure(results, FUNCTIONS, FUNC_STYLES, images_dir / "fig6_metrics.png")
+    save_metrics_figure(results, FUNCTIONS, FUNC_STYLES, images_dir / "fig5.png")
 
 
 if __name__ == "__main__":

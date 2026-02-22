@@ -38,8 +38,8 @@ uv run examples/bioma/fig1.py
 
 Constructs CMLONs for the three synthetic functions across dimensions 3, 5, and 8. Produces:
 
-- **Figure 2** (`fig2.png`) — Metrics comparison (nodes, funnels, neutrality, strength, success, deviation) across dimensions.
-- **Figure 3** (`fig3.png`) — 3×3 grid of 2D CMLON network visualizations, plus individual per-function/dimension plots.
+- **Figure 2** (`fig2.png`) — Metrics comparison across dimensions.
+- **Figure 3** (`fig3.png`) — 3×3 grid of 2D CMLON network visualizations.
 
 ```bash
 uv run examples/bioma/fig3.py
@@ -59,15 +59,17 @@ uv run examples/bioma/fig4.py
 
 ![Figure 4](../../images/fig4.png)
 
-### Figure 6 — Real-World Problem CMLONs ([`fig6.py`](fig6.py))
+### Figure 5 & 6 — Real-World Problem CMLONs ([`fig6.py`](fig6.py))
 
 2D CMLON network plots for the two real-world problems:
 
-- Spread Spectrum Radar Polly Phase (dimensions 3, 5, 8, 13)
-- SSC Ruspini clustering (dimensions 6, 8, 10, 12)
+- **Figure 5** (`fig5.png`) — Metrics comparison across dimensions.
+- **Figure 6** (`fig6.png`) — 2×3 grid of 2D CMLON network visualizations.
 
 ```bash
 uv run examples/bioma/fig6.py
 ```
+
+![Figure 5](../../images/fig5.png)
 
 ![Figure 6](../../images/fig6.png)
