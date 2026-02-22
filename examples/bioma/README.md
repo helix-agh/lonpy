@@ -45,6 +45,8 @@ Constructs CMLONs for the three synthetic functions across dimensions 3, 5, and 
 uv run examples/bioma/fig3.py
 ```
 
+![Figure 2](../../images/fig2.png)
+
 ![Figure 3](../../images/fig3.png)
 
 ### Figure 4 — 3D CMLON Visualizations ([`fig4.py`](fig4.py))
