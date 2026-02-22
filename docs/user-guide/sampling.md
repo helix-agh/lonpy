@@ -28,7 +28,7 @@ from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 
 config = BasinHoppingSamplerConfig(
     n_runs=30,                                  # Number of independent runs
-    max_perturbations_without_improvement=500,  # Stop after this many non-improving perturbations
+    max_perturbations_without_improvement=500,  # Stop after this many consecutive non-improving perturbations
     step_mode="percentage",                     # "percentage" or "fixed"
     step_size=0.1,                              # Perturbation magnitude
     coordinate_precision=4,                     # Precision for node identification (None = full)
