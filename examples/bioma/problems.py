@@ -41,20 +41,14 @@ def spread_spectrum_radar_polly_phase(x: np.ndarray) -> float:
     return np.max(hsum)
 
 
-def sum_of_squares(center: np.ndarray, x: list[tuple[int, int]]) -> float:
-    f = 0.0
-    for i in range(len(x)):
-        sse = np.inf
-        for j in range(len(center)):
-            dj = np.sum((x[i] - center[j]) ** 2)
-            if dj < sse:
-                sse = dj
-        f += sse
-    return f
+def sum_of_squares(center: np.ndarray, x: np.ndarray) -> float:
+    # x: (N, D), center: (K, D) -> dists: (N, K)
+    dists = np.sum((x[:, np.newaxis, :] - center[np.newaxis, :, :]) ** 2, axis=2)
+    return float(np.sum(np.min(dists, axis=1)))
 
 
-def ssc_ruspini(c: np.ndarray) -> float:
-    x = [
+_RUSPINI_DATA = np.array(
+    [
         (4, 53),
         (5, 63),
         (10, 59),
@@ -130,6 +124,11 @@ def ssc_ruspini(c: np.ndarray) -> float:
         (76, 27),
         (72, 31),
         (64, 30),
-    ]
-    center = np.reshape(c, (int(len(c) / 2), 2))
-    return sum_of_squares(center, x)
+    ],
+    dtype=float,
+)
+
+
+def ssc_ruspini(c: np.ndarray) -> float:
+    center = c.reshape(-1, 2)
+    return sum_of_squares(center, _RUSPINI_DATA)
