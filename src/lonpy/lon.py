@@ -221,7 +221,8 @@ class LON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of nodes with equal-fitness connections
-                - strength: Proportion of incoming strength to global optima
+                - strength: Incoming strength to global optima / total incoming strength (all nodes)
+                - sink_strength: Incoming strength to global sinks / incoming strength to all sinks
         """
         best = known_best if known_best is not None else self.best_fitness
 
@@ -247,7 +248,7 @@ class LON:
         else:
             neutral = 0.0
 
-        # Strength: incoming strength to global optima
+        # Strength (all nodes): incoming strength to global optima / total incoming strength
         igs = self.get_global_optima_indices()
         if self.n_edges > 0 and igs:
             edge_weights = self.graph.es["Count"]
@@ -257,12 +258,30 @@ class LON:
         else:
             strength = 0.0
 
+        # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
+        global_sinks = [s for s in sinks_id if self._allclose(self.vertex_fitness[s], best)]
+        local_sinks = [s for s in sinks_id if not self._allclose(self.vertex_fitness[s], best)]
+        if self.n_edges > 0 and global_sinks:
+            edge_weights = self.graph.es["Count"]
+            sing = sum(
+                self.graph.strength(global_sinks, mode="in", loops=False, weights=edge_weights)
+            )
+            sinl = (
+                sum(self.graph.strength(local_sinks, mode="in", loops=False, weights=edge_weights))
+                if local_sinks
+                else 0
+            )
+            sink_strength = round(sing / (sing + sinl), 4) if (sing + sinl) > 0 else 0.0
+        else:
+            sink_strength = 0.0
+
         return {
             "n_optima": n_optima,
             "n_funnels": n_funnels,
             "n_global_funnels": n_global_funnels,
             "neutral": neutral,
             "strength": strength,
+            "sink_strength": sink_strength,
         }
 
     def compute_performance_metrics(self, known_best: float | None = None) -> dict[str, Any]:
@@ -308,7 +327,7 @@ class LON:
 
         Returns:
             Dictionary containing all network and performance metrics:
-                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, strength
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, strength, sink_strength
                 Performance metrics: success, deviation
         """
         network_metrics = self.compute_network_metrics(known_best)
@@ -477,7 +496,8 @@ class CMLON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of contracted nodes
-                - strength: Ratio of incoming strength to global vs local sinks
+                - strength: Incoming strength to global sinks / total incoming strength (all nodes)
+                - sink_strength: Incoming strength to global sinks / incoming strength to all sinks
                 - global_funnel_proportion: Proportion of nodes that can reach
                   a global optimum
         """
@@ -497,8 +517,9 @@ class CMLON:
         else:
             neutral = 0.0
 
-        # Strength: normalised ratio of incoming strength to global
+        # Strength (all nodes): incoming strength to global sinks / total incoming strength
         igs = [s for s, f in zip(sinks_id, sinks_fit) if self._allclose(f, best)]
+        ils = [s for s, f in zip(sinks_id, sinks_fit) if not self._allclose(f, best)]
 
         if self.n_edges > 0:
             edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
@@ -512,6 +533,18 @@ class CMLON:
         else:
             strength = 0.0
 
+        # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
+        if self.n_edges > 0 and igs:
+            edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
+            sinl = (
+                sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights))
+                if ils
+                else 0
+            )
+            sink_strength = round(sing / (sing + sinl), 4) if (sing + sinl) > 0 else 0.0
+        else:
+            sink_strength = 0.0
+
         gfunnel = self._compute_global_funnel_proportion()
 
         return {
@@ -520,6 +553,7 @@ class CMLON:
             "n_global_funnels": n_global_funnels,
             "neutral": neutral,
             "strength": strength,
+            "sink_strength": sink_strength,
             "global_funnel_proportion": gfunnel,
         }
 
@@ -572,7 +606,7 @@ class CMLON:
         Returns:
             Dictionary containing all network and performance metrics:
                 Network metrics: n_optima, n_funnels, n_global_funnels, neutral,
-                    strength, global_funnel_proportion
+                    strength, sink_strength, global_funnel_proportion
                 Performance metrics: success, deviation (from source LON)
         """
         network_metrics = self.compute_network_metrics(known_best)
