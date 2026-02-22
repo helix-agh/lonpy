@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Literal
@@ -102,21 +103,6 @@ class BasinHoppingSampler:
 
         return rng.uniform(domain_array[:, 0], domain_array[:, 1], size=(n_runs, n_var))
 
-    def _apply_bounds(self, x: np.ndarray, bounds: np.ndarray | None = None) -> np.ndarray:
-        """Clip point to lie strictly inside bounds.
-
-        scipy's L-BFGS-B treats x0 exactly on a bound as a constraint
-        violation, so we nudge by the smallest representable increment
-        (ULP) relative to each bound value.
-        """
-        if self.config.bounded and bounds is not None:
-            lower = bounds[:, 0]
-            upper = bounds[:, 1]
-            eps_lower = np.maximum(np.spacing(np.abs(lower)), np.finfo(float).tiny)
-            eps_upper = np.maximum(np.spacing(np.abs(upper)), np.finfo(float).tiny)
-            return np.clip(x, lower + eps_lower, upper - eps_upper)
-        return x
-
     def _perturbation(
         self,
         x: np.ndarray,
@@ -124,7 +110,9 @@ class BasinHoppingSampler:
         bounds: np.ndarray | None = None,
     ) -> np.ndarray:
         y = x + np.random.uniform(low=-p, high=p)
-        return self._apply_bounds(y, bounds)
+        if self.config.bounded and bounds is not None:
+            return np.clip(y, bounds[:, 0], bounds[:, 1])
+        return y
 
     def _round_value(self, value: np.ndarray, precision: int | None) -> np.ndarray:
         if precision is None or precision < 0:
@@ -195,15 +183,21 @@ class BasinHoppingSampler:
             if progress_callback:
                 progress_callback(run, self.config.n_runs)
 
-            x0 = self._apply_bounds(initial_points[run - 1], bounds_array)
-
-            res = minimize(
-                func,
-                x0,
-                method=self.config.minimizer_method,
-                options=self.config.minimizer_options,
-                bounds=bounds_array if self.config.bounded else None,
-            )
+            try:
+                res = minimize(
+                    func,
+                    initial_points[run - 1],
+                    method=self.config.minimizer_method,
+                    options=self.config.minimizer_options,
+                    bounds=bounds_array if self.config.bounded else None,
+                )
+            except ValueError as e:
+                warnings.warn(
+                    f"Run {run}: initial minimize failed with ValueError: {e}. "
+                    f"Starting point: {initial_points[run - 1]}. Skipping run.",
+                    stacklevel=1,
+                )
+                continue
 
             current_x = res.x
             current_f = res.fun
@@ -216,13 +210,27 @@ class BasinHoppingSampler:
                 < self.config.max_perturbations_without_improvement
             ):
                 x_perturbed = self._perturbation(current_x, p, bounds_array)
-                res = minimize(
-                    func,
-                    x_perturbed,
-                    method=self.config.minimizer_method,
-                    options=self.config.minimizer_options,
-                    bounds=bounds_array if self.config.bounded else None,
-                )
+                try:
+                    res = minimize(
+                        func,
+                        x_perturbed,
+                        method=self.config.minimizer_method,
+                        options=self.config.minimizer_options,
+                        bounds=bounds_array if self.config.bounded else None,
+                    )
+                except ValueError as e:
+                    # L-BFGS-B can produce internal iterates that slightly
+                    # violate bounds, causing approx_derivative to fail.
+                    # Skip this perturbation and try the next one.
+                    warnings.warn(
+                        f"Run {run}, iteration {run_index}: minimize after perturbation "
+                        f"failed with ValueError: {e}. "
+                        f"Perturbed point: {x_perturbed}. Skipping perturbation.",
+                        stacklevel=1,
+                    )
+                    perturbations_without_improvement += 1
+                    run_index += 1
+                    continue
 
                 new_x = res.x
                 new_f = res.fun
