@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -72,16 +73,33 @@ METRIC_PANELS = [
 ]
 
 
+def _build_one(
+    func_name: str,
+    func_cfg: FunctionConfig,
+    n_var: int,
+) -> tuple[str, int, CMLON, dict]:
+    """Build a single CMLON and compute its metrics (top-level for pickling)."""
+    print(f"Sampling {func_name} n={n_var} ...")
+    cmlon = build_cmlon(func_cfg, n_var)
+    metrics = cmlon.compute_metrics(known_best=func_cfg.best)
+    return func_name, n_var, cmlon, metrics
+
+
 def build_all(
     functions: dict[str, FunctionConfig],
 ) -> dict[tuple[str, int], tuple[CMLON, dict]]:
-    """Build all CMLONs and collect metrics."""
+    """Build all CMLONs and collect metrics (in parallel across functions/dimensions)."""
+    tasks = [
+        (func_name, func_cfg, n_var)
+        for func_name, func_cfg in functions.items()
+        for n_var in func_cfg.dimensions
+    ]
+
     results: dict[tuple[str, int], tuple[CMLON, dict]] = {}
-    for func_name, func_cfg in functions.items():
-        for n_var in func_cfg.dimensions:
-            print(f"Sampling {func_name} n={n_var} ...")
-            cmlon = build_cmlon(func_cfg, n_var)
-            metrics = cmlon.compute_metrics(known_best=func_cfg.best)
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(_build_one, *t) for t in tasks]
+        for future in futures:
+            func_name, n_var, cmlon, metrics = future.result()
             results[(func_name, n_var)] = (cmlon, metrics)
     return results
 

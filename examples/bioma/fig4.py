@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from plotly.subplots import make_subplots
@@ -36,12 +37,17 @@ def main() -> None:
     viz = LONVisualizer()
     func_names = list(FUNCTIONS.keys())
 
-    # Build CMLONs and individual 3D figures
+    # Build CMLONs in parallel, then create 3D figures
+    with ProcessPoolExecutor() as executor:
+        futures = {
+            func_name: executor.submit(build_cmlon, FUNCTIONS[func_name], N_VAR)
+            for func_name in func_names
+        }
+        cmlons = {name: fut.result() for name, fut in futures.items()}
+
     figures = []
     for func_name in func_names:
-        print(f"Sampling {func_name} n={N_VAR} ...")
-        cmlon = build_cmlon(FUNCTIONS[func_name], N_VAR)
-        fig = viz.plot_3d(cmlon)
+        fig = viz.plot_3d(cmlons[func_name])
         figures.append(fig)
 
     # Combine into a single 1x3 subplot figure

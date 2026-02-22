@@ -20,7 +20,7 @@ FUNCTIONS = {
         step_size=1.2566,
         max_perturbations_without_improvement=100,
         coordinate_precision=1,
-        dimensions=[3, 5, 8, 13],
+        dimensions=[3, 5, 8],
         best=0.5,
     ),
     "SSCRuspini": FunctionConfig(
@@ -29,7 +29,7 @@ FUNCTIONS = {
         step_size=48.64,
         max_perturbations_without_improvement=100,
         coordinate_precision=0,
-        dimensions=[6, 8, 10, 12],
+        dimensions=[4, 6, 8],
         best=None,
     ),
 }
