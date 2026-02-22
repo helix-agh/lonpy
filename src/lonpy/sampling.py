@@ -84,7 +84,6 @@ class BasinHoppingSampler:
 
         Args:
             domain_array: Array of shape (n_var, 2) with [lower, upper] bounds.
-            rng: NumPy random Generator instance.
 
         Returns:
             Array of shape (n_runs, n_var) with initial points.
