@@ -107,7 +107,7 @@ class StepSizeEstimator:
                 options=self.config.minimizer_options,
                 bounds=bounds_array,
             )
-            optimum = sampler._round_value(res.x, self.config.coordinate_precision)
+            optimum = res.x
             optimum_hash = sampler._hash_solution(optimum)
 
             escapes = 0
@@ -120,10 +120,7 @@ class StepSizeEstimator:
                     options=self.config.minimizer_options,
                     bounds=bounds_array,
                 )
-                new_optimum = sampler._round_value(
-                    res_perturbed.x, self.config.coordinate_precision
-                )
-                new_hash = sampler._hash_solution(new_optimum)
+                new_hash = sampler._hash_solution(res_perturbed.x)
                 if new_hash != optimum_hash:
                     escapes += 1
 
