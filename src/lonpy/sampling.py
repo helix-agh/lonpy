@@ -5,10 +5,12 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+from scipy.stats.qmc import LatinHypercube, scale
 
 from lonpy.lon import LON, LONConfig
 
 StepMode = Literal["percentage", "fixed"]
+InitMode = Literal["uniform", "lhs"]
 
 
 @dataclass
@@ -26,6 +28,9 @@ class BasinHoppingSamplerConfig:
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
         max_perturbations_without_improvement: Number of perturbations without improvement before stopping.
+        init_mode: Initialization strategy for starting points - "uniform" for
+            uniform random sampling, "lhs" for Latin Hypercube Sampling
+            (better space-filling coverage).
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
@@ -42,6 +47,7 @@ class BasinHoppingSamplerConfig:
 
     n_runs: int = 100
     max_perturbations_without_improvement: int = 1000
+    init_mode: InitMode = "uniform"
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     fitness_precision: int | None = None
@@ -71,6 +77,46 @@ class BasinHoppingSampler:
     def __init__(self, config: BasinHoppingSamplerConfig | None = None):
         self.config = config or BasinHoppingSamplerConfig()
 
+    def _generate_initial_points(self, domain_array: np.ndarray) -> np.ndarray:
+        """
+        Generate initial starting points for all Basin-Hopping runs.
+
+        Args:
+            domain_array: Array of shape (n_var, 2) with [lower, upper] bounds.
+            rng: NumPy random Generator instance.
+
+        Returns:
+            Array of shape (n_runs, n_var) with initial points.
+        """
+        n_runs = self.config.n_runs
+        n_var = domain_array.shape[0]
+
+        rng = np.random.default_rng(self.config.seed)
+
+        if self.config.init_mode == "lhs":
+            sampler = LatinHypercube(d=n_var, seed=rng)
+            unit_samples = sampler.random(n=n_runs)
+            return np.asarray(
+                scale(unit_samples, domain_array[:, 0], domain_array[:, 1]), dtype=float
+            )
+
+        return rng.uniform(domain_array[:, 0], domain_array[:, 1], size=(n_runs, n_var))
+
+    def _apply_bounds(self, x: np.ndarray, bounds: np.ndarray | None = None) -> np.ndarray:
+        """Clip point to lie strictly inside bounds.
+
+        scipy's L-BFGS-B treats x0 exactly on a bound as a constraint
+        violation, so we nudge by the smallest representable increment
+        (ULP) relative to each bound value.
+        """
+        if self.config.bounded and bounds is not None:
+            lower = bounds[:, 0]
+            upper = bounds[:, 1]
+            eps_lower = np.maximum(np.spacing(np.abs(lower)), np.finfo(float).tiny)
+            eps_upper = np.maximum(np.spacing(np.abs(upper)), np.finfo(float).tiny)
+            return np.clip(x, lower + eps_lower, upper - eps_upper)
+        return x
+
     def _perturbation(
         self,
         x: np.ndarray,
@@ -78,9 +124,7 @@ class BasinHoppingSampler:
         bounds: np.ndarray | None = None,
     ) -> np.ndarray:
         y = x + np.random.uniform(low=-p, high=p)
-        if self.config.bounded and bounds is not None:
-            return np.clip(y, bounds[:, 0], bounds[:, 1])
-        return y
+        return self._apply_bounds(y, bounds)
 
     def _round_value(self, value: np.ndarray, precision: int | None) -> np.ndarray:
         if precision is None or precision < 0:
@@ -145,12 +189,13 @@ class BasinHoppingSampler:
         bounds_array = domain_array if self.config.bounded else None
         raw_records = []
 
+        initial_points = self._generate_initial_points(domain_array)
+
         for run in range(1, self.config.n_runs + 1):
             if progress_callback:
                 progress_callback(run, self.config.n_runs)
 
-            # Random initial point
-            x0 = np.random.uniform(domain_array[:, 0], domain_array[:, 1])
+            x0 = self._apply_bounds(initial_points[run - 1], bounds_array)
 
             res = minimize(
                 func,
@@ -309,6 +354,7 @@ def compute_lon(
     seed: int | None = None,
     step_size: float = 0.01,
     step_mode: StepMode = "fixed",
+    init_mode: InitMode = "uniform",
     n_runs: int = 100,
     max_perturbations_without_improvement: int = 1000,
     fitness_precision: int | None = None,
@@ -330,6 +376,7 @@ def compute_lon(
         seed: Random seed for reproducibility.
         step_size: Perturbation step size.
         step_mode: "percentage" (of domain) or "fixed".
+        init_mode: "uniform" for uniform random sampling, "lhs" for Latin Hypercube Sampling.
         n_runs: Number of independent Basin-Hopping runs.
         max_perturbations_without_improvement: Maximum number of consecutive non-improving perturbations before stopping each run.
         fitness_precision: Decimal precision for fitness values (None for full double). Passing negative values behaves the same as passing None.
@@ -359,6 +406,7 @@ def compute_lon(
     config = BasinHoppingSamplerConfig(
         n_runs=n_runs,
         max_perturbations_without_improvement=max_perturbations_without_improvement,
+        init_mode=init_mode,
         step_mode=step_mode,
         step_size=step_size,
         fitness_precision=fitness_precision,
