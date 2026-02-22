@@ -190,7 +190,7 @@ class BasinHoppingSampler:
                 warnings.warn(
                     f"Run {run}: initial minimize failed with ValueError: {e}. "
                     f"Starting point: {initial_points[run - 1]}. Skipping run.",
-                    stacklevel=1,
+                    stacklevel=3,
                 )
                 continue
 
@@ -221,7 +221,7 @@ class BasinHoppingSampler:
                         f"Run {run}, iteration {run_index}: minimize after perturbation "
                         f"failed with ValueError: {e}. "
                         f"Perturbed point: {x_perturbed}. Skipping perturbation.",
-                        stacklevel=1,
+                        stacklevel=3,
                     )
                     perturbations_without_improvement += 1
                     run_index += 1
