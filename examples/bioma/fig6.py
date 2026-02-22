@@ -1,8 +1,15 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from problems import spread_spectrum_radar_polly_phase, ssc_ruspini
-from utils import IMAGES_DIR, FunctionConfig, build_cmlon
+from utils import (
+    IMAGES_DIR,
+    FunctionConfig,
+    build_all,
+    save_metrics_figure,
+    save_network_grid,
+)
 
 from lonpy import LONVisualizer
 
@@ -23,22 +30,35 @@ FUNCTIONS = {
         max_perturbations_without_improvement=100,
         coordinate_precision=0,
         dimensions=[6, 8, 10, 12],
-        best=None,  # 51064, 12882, 10127, 8576 depending on dim
+        best=None,
     ),
 }
 
+FUNC_STYLES = {
+    "SpreadSpectrumRadarPollyPhase": {"color": "tab:red", "marker": "o"},
+    "SSCRuspini": {"color": "tab:orange", "marker": "s"},
+}
+
+
+def save_individual_figures(results: dict, images_dir: Path) -> None:
+    """Save individual CMLON network plots."""
+    viz = LONVisualizer()
+    for (func_name, n_var), (cmlon, _metrics) in results.items():
+        path = images_dir / f"fig6_{func_name}_dim{n_var}.png"
+        fig = viz.plot_2d(cmlon, output_path=str(path))
+        plt.close(fig)
+        print(f"  Saved {path}")
+
 
 def main() -> None:
-    Path(IMAGES_DIR).mkdir(parents=True, exist_ok=True)
+    images_dir = Path(IMAGES_DIR)
+    images_dir.mkdir(parents=True, exist_ok=True)
 
-    viz = LONVisualizer()
+    results = build_all(FUNCTIONS)
 
-    for func_name, func_cfg in FUNCTIONS.items():
-        for n_var in func_cfg.dimensions:
-            print(f"Sampling {func_name} n={n_var} ...")
-            cmlon = build_cmlon(func_cfg, n_var)
-
-            viz.plot_2d(cmlon, output_path=f"{IMAGES_DIR}/fig6_{func_name}_dim{n_var}.png")
+    save_individual_figures(results, images_dir)
+    save_network_grid(results, FUNCTIONS, images_dir / "fig6.png")
+    save_metrics_figure(results, FUNCTIONS, FUNC_STYLES, images_dir / "fig6_metrics.png")
 
 
 if __name__ == "__main__":
