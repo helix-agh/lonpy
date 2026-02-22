@@ -22,7 +22,7 @@ lon = compute_lon(
     lower_bound=-5.12,   # Search space lower bound
     upper_bound=5.12,    # Search space upper bound
     n_runs=20,           # Number of Basin-Hopping runs
-    max_perturbations_without_improvement=500,  # Stop after this many non-improving perturbations
+    max_perturbations_without_improvement=500,  # Stop after this many consecutive non-improving perturbations
     seed=42              # For reproducibility
 )
 
