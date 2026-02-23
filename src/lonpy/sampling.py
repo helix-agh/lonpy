@@ -1,7 +1,7 @@
 import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
-from typing import Literal
+from typing import Literal, get_args
 
 import numpy as np
 import pandas as pd
@@ -99,7 +99,13 @@ class BasinHoppingSampler:
                 scale(unit_samples, domain_array[:, 0], domain_array[:, 1]), dtype=float
             )
 
-        return self._rng.uniform(domain_array[:, 0], domain_array[:, 1], size=(n_runs, n_var))
+        if self.config.init_mode == "uniform":
+            return self._rng.uniform(domain_array[:, 0], domain_array[:, 1], size=(n_runs, n_var))
+
+        valid_modes = ", ".join(f'"{m}"' for m in get_args(InitMode))
+        raise ValueError(
+            f"Unknown init_mode '{self.config.init_mode}'. " f"Supported modes are: {valid_modes}."
+        )
 
     def _perturbation(
         self,
