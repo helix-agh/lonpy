@@ -10,7 +10,6 @@ from lonpy.lon import LON, LONConfig
 
 StepMode = Literal["percentage", "fixed"]
 
-
 @dataclass
 class BasinHoppingSamplerConfig:
     """
@@ -25,7 +24,7 @@ class BasinHoppingSamplerConfig:
 
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
-        n_iter_no_change: Number of iterations without improvement before stopping each run.
+        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
@@ -35,13 +34,18 @@ class BasinHoppingSamplerConfig:
             Solutions rounded to this precision are considered identical.
             Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
         bounded: Whether to enforce domain bounds during perturbation.
-        minimizer_method: Scipy minimizer method (default: "L-BFGS-B").
-        minimizer_options: Options passed to scipy.optimize.minimize.
+        minimizer_method: Minimization method passed to ``scipy.optimize.minimize``. Can be a
+            string or a callable implementing a custom solver.
+            See `scipy.optimize.minimize <https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>`_
+            for the full list of supported methods and their options (default: ``"L-BFGS-B"``).
+        minimizer_options: Solver-specific options passed as the ``options`` argument to
+            ``scipy.optimize.minimize``. The available keys depend on the chosen
+            ``minimizer_method``. Use ``None`` to rely on scipy's defaults.
         seed: Random seed for reproducibility.
     """
 
     n_runs: int = 100
-    n_iter_no_change: int  = 1000
+    n_iter_no_change: int = 1000
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     fitness_precision: int | None = None
@@ -166,10 +170,7 @@ class BasinHoppingSampler:
             perturbations_without_improvement = 0
             run_index = 0
 
-            while (
-                perturbations_without_improvement
-                < self.config.n_iter_no_change
-            ):
+            while perturbations_without_improvement < self.config.n_iter_no_change:
                 x_perturbed = self._perturbation(current_x, p, bounds_array)
                 res = minimize(
                     func,
@@ -328,13 +329,17 @@ def compute_lon(
         lower_bound: Lower bound (scalar or per-dimension list/array).
         upper_bound: Upper bound (scalar or per-dimension list/array).
         seed: Random seed for reproducibility.
-        step_size: Perturbation step size.
-        step_mode: "percentage" (of domain) or "fixed".
+        step_size: Perturbation magnitude (interpretation depends on step_mode).
+        step_mode: Perturbation mode - "percentage" (of domain range)
+            or "fixed" (absolute step size).
         n_runs: Number of independent Basin-Hopping runs.
         n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
-        fitness_precision: Decimal precision for fitness values (None for full double). Passing negative values behaves the same as passing None.
-        coordinate_precision: Decimal precision for coordinate hashing (None for no rounding). Passing negative values behaves the same as passing None.
-        bounded: Whether to enforce domain bounds.
+        fitness_precision: Decimal precision for fitness values.
+            Use None for full double precision. Passing negative values behaves the same as passing None.
+        coordinate_precision: Decimal precision for coordinate rounding and hashing.
+            Solutions rounded to this precision are considered identical.
+            Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
+        bounded: Whether to enforce domain bounds during perturbation.
 
     Returns:
         LON instance.
