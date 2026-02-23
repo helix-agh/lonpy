@@ -221,8 +221,8 @@ class LON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of nodes with equal-fitness connections
-                - strength: Incoming strength to global optima / total incoming strength (all nodes)
-                - sink_strength: Incoming strength to global sinks / incoming strength to all sinks
+                - global_strength: Proportion of global sinks incoming strength to total incoming strength of all nodes
+                - sink_strength: Proportion of global sinks incoming strength to incoming strength of all sink nodes
         """
         best = known_best if known_best is not None else self.best_fitness
 
@@ -248,15 +248,15 @@ class LON:
         else:
             neutral = 0.0
 
-        # Strength (all nodes): incoming strength to global optima / total incoming strength
+        # Strength (global): incoming strength to global optima / total incoming strength
         igs = self.get_global_optima_indices()
         if self.n_edges > 0 and igs:
             edge_weights = self.graph.es["Count"]
             stren_igs = sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights))
             stren_all = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
-            strength = round(stren_igs / stren_all, 4) if stren_all > 0 else 0.0
+            global_strength = round(stren_igs / stren_all, 4) if stren_all > 0 else 0.0
         else:
-            strength = 0.0
+            global_strength = 0.0
 
         # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
         global_sinks = [s for s in sinks_id if self._allclose(self.vertex_fitness[s], best)]
@@ -280,7 +280,7 @@ class LON:
             "n_funnels": n_funnels,
             "n_global_funnels": n_global_funnels,
             "neutral": neutral,
-            "strength": strength,
+            "global_strength": global_strength,
             "sink_strength": sink_strength,
         }
 
@@ -496,8 +496,8 @@ class CMLON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of contracted nodes
-                - strength: Incoming strength to global sinks / total incoming strength (all nodes)
-                - sink_strength: Incoming strength to global sinks / incoming strength to all sinks
+                - global_strength: Proportion of global sinks incoming strength to total incoming strength of all nodes
+                - sink_strength: Proportion of global sinks incoming strength to incoming strength of all sink nodes
                 - global_funnel_proportion: Proportion of nodes that can reach
                   a global optimum
         """
@@ -517,7 +517,7 @@ class CMLON:
         else:
             neutral = 0.0
 
-        # Strength (all nodes): incoming strength to global sinks / total incoming strength
+        # Strength (global): incoming strength to global sinks / total incoming strength
         igs = [s for s, f in zip(sinks_id, sinks_fit) if self._allclose(f, best)]
         ils = [s for s, f in zip(sinks_id, sinks_fit) if not self._allclose(f, best)]
 
@@ -529,9 +529,9 @@ class CMLON:
                 else 0
             )
             total = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
-            strength = round(sing / total, 4) if total > 0 else 0.0
+            global_strength = round(sing / total, 4) if total > 0 else 0.0
         else:
-            strength = 0.0
+            global_strength = 0.0
 
         # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
         if self.n_edges > 0 and igs:
@@ -552,7 +552,7 @@ class CMLON:
             "n_funnels": n_funnels,
             "n_global_funnels": n_global_funnels,
             "neutral": neutral,
-            "strength": strength,
+            "global_strength": global_strength,
             "sink_strength": sink_strength,
             "global_funnel_proportion": gfunnel,
         }
