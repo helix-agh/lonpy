@@ -522,7 +522,7 @@ class CMLON:
         ils = [s for s, f in zip(sinks_id, sinks_fit) if not self._allclose(f, best)]
 
         if self.n_edges > 0:
-            edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
+            edge_weights = self.graph.es["Count"]
             sing = (
                 sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights))
                 if igs
@@ -535,7 +535,7 @@ class CMLON:
 
         # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
         if self.n_edges > 0 and igs:
-            edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
+            edge_weights = self.graph.es["Count"]
             sinl = (
                 sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights))
                 if ils
