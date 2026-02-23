@@ -307,14 +307,7 @@ def compute_lon(
     dim: int,
     lower_bound: float | Sequence[float],
     upper_bound: float | Sequence[float],
-    seed: int | None = None,
-    step_size: float = 0.01,
-    step_mode: StepMode = "fixed",
-    n_runs: int = 100,
-    n_iter_no_change: int = 1000,
-    fitness_precision: int | None = None,
-    coordinate_precision: int | None = 5,
-    bounded: bool = True,
+    config: BasinHoppingSamplerConfig | None = None,
     lon_config: LONConfig | None = None,
 ) -> LON:
     """
@@ -328,18 +321,9 @@ def compute_lon(
         dim: Number of dimensions.
         lower_bound: Lower bound (scalar or per-dimension list/array).
         upper_bound: Upper bound (scalar or per-dimension list/array).
-        seed: Random seed for reproducibility.
-        step_size: Perturbation magnitude (interpretation depends on step_mode).
-        step_mode: Perturbation mode - "percentage" (of domain range)
-            or "fixed" (absolute step size).
-        n_runs: Number of independent Basin-Hopping runs.
-        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
-        fitness_precision: Decimal precision for fitness values.
-            Use None for full double precision. Passing negative values behaves the same as passing None.
-        coordinate_precision: Decimal precision for coordinate rounding and hashing.
-            Solutions rounded to this precision are considered identical.
-            Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
-        bounded: Whether to enforce domain bounds during perturbation.
+        config: Basin-Hopping sampler configuration. Uses default
+            BasinHoppingSamplerConfig if not provided.
+        lon_config: LON construction configuration.
 
     Returns:
         LON instance.
@@ -360,17 +344,6 @@ def compute_lon(
     )
 
     domain = list(zip(lower_bounds, upper_bounds, strict=True))
-
-    config = BasinHoppingSamplerConfig(
-        n_runs=n_runs,
-        n_iter_no_change=n_iter_no_change,
-        step_mode=step_mode,
-        step_size=step_size,
-        fitness_precision=fitness_precision,
-        coordinate_precision=coordinate_precision,
-        bounded=bounded,
-        seed=seed,
-    )
 
     sampler = BasinHoppingSampler(config)
     return sampler.sample_to_lon(func, domain, lon_config=lon_config)
