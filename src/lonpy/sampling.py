@@ -10,6 +10,7 @@ from lonpy.lon import LON, LONConfig
 
 StepMode = Literal["percentage", "fixed"]
 
+
 @dataclass
 class BasinHoppingSamplerConfig:
     """
@@ -24,7 +25,8 @@ class BasinHoppingSamplerConfig:
 
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
-        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
+        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run. Use None for no limit.
+        max_iter: Optional maximum number of total iterations (perturbation steps) per run. Use None for no limit.
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
@@ -45,7 +47,8 @@ class BasinHoppingSamplerConfig:
     """
 
     n_runs: int = 100
-    n_iter_no_change: int = 1000
+    n_iter_no_change: int | None = 1000
+    max_iter: int | None = None
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     fitness_precision: int | None = None
@@ -56,6 +59,12 @@ class BasinHoppingSamplerConfig:
         default_factory=lambda: {"ftol": 1e-07, "gtol": 0, "maxiter": 15000}
     )
     seed: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.n_iter_no_change is None and self.max_iter is None:
+            raise ValueError(
+                "At least one stopping criterion must be set: n_iter_no_change and/or max_iter."
+            )
 
 
 class BasinHoppingSampler:
@@ -167,10 +176,18 @@ class BasinHoppingSampler:
             current_x = res.x
             current_f = res.fun
 
-            perturbations_without_improvement = 0
-            run_index = 0
+            iters_without_improvement = 0
+            iter_index = 0
 
-            while perturbations_without_improvement < self.config.n_iter_no_change:
+            while True:
+                if self.config.max_iter is not None and iter_index >= self.config.max_iter:
+                    break
+                if (
+                    self.config.n_iter_no_change is not None
+                    and iters_without_improvement >= self.config.n_iter_no_change
+                ):
+                    break
+
                 x_perturbed = self._perturbation(current_x, p, bounds_array)
                 res = minimize(
                     func,
@@ -186,7 +203,7 @@ class BasinHoppingSampler:
                 raw_records.append(
                     {
                         "run": run,
-                        "iteration": run_index,
+                        "iteration": iter_index,
                         "current_x": current_x.copy(),
                         "current_f": current_f,
                         "new_x": new_x.copy(),
@@ -195,17 +212,18 @@ class BasinHoppingSampler:
                     }
                 )
 
-                if new_f < current_f:
-                    perturbations_without_improvement = 0
-                else:
-                    perturbations_without_improvement += 1
+                if self.config.n_iter_no_change is not None:
+                    if new_f < current_f:
+                        iters_without_improvement = 0
+                    else:
+                        iters_without_improvement += 1
 
                 # Acceptance criterion (minimization: accept if better or equal)
                 if new_f <= current_f:
                     current_x = new_x.copy()
                     current_f = new_f
 
-                run_index += 1
+                iter_index += 1
 
         return raw_records
 
