@@ -209,7 +209,7 @@ class LON:
 
     def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
-        Compute LON metrics.
+        Compute LON network metrics.
 
         Args:
             known_best: Known global optimum value. If None, uses the best
@@ -221,7 +221,7 @@ class LON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of nodes with equal-fitness connections
-                - global_strength: Proportion of global sinks incoming strength to total incoming strength of all nodes
+                - global_strength: Proportion of global optima incoming strength to total incoming strength of all nodes
                 - sink_strength: Proportion of global sinks incoming strength to incoming strength of all sink nodes
         """
         best = known_best if known_best is not None else self.best_fitness
@@ -327,7 +327,7 @@ class LON:
 
         Returns:
             Dictionary containing all network and performance metrics:
-                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, strength, sink_strength
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, global_strength, sink_strength
                 Performance metrics: success, deviation
         """
         network_metrics = self.compute_network_metrics(known_best)
@@ -484,7 +484,7 @@ class CMLON:
 
     def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
-        Compute CMLON metrics.
+        Compute CMLON network metrics.
 
         Args:
             known_best: Known global optimum value. If None, uses the best
@@ -606,7 +606,7 @@ class CMLON:
         Returns:
             Dictionary containing all network and performance metrics:
                 Network metrics: n_optima, n_funnels, n_global_funnels, neutral,
-                    strength, sink_strength, global_funnel_proportion
+                    global_strength, sink_strength, global_funnel_proportion
                 Performance metrics: success, deviation (from source LON)
         """
         network_metrics = self.compute_network_metrics(known_best)
