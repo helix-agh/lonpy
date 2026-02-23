@@ -201,12 +201,6 @@ class LON:
         out_degrees = self.graph.degree(mode="out")
         return [i for i, d in enumerate(out_degrees) if d == 0]
 
-    def get_global_optima_indices(self) -> list[int]:
-        """Get indices of global optima nodes (nodes at best fitness)."""
-        return [
-            i for i, f in enumerate(self.vertex_fitness) if self._allclose(f, self.best_fitness)
-        ]
-
     def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
         Compute LON network metrics.
@@ -249,7 +243,7 @@ class LON:
             neutral = 0.0
 
         # Strength (global): incoming strength to global optima / total incoming strength
-        igs = self.get_global_optima_indices()
+        igs = [i for i, f in enumerate(self.vertex_fitness) if self._allclose(f, best)]
         if self.n_edges > 0 and igs:
             edge_weights = self.graph.es["Count"]
             stren_igs = sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights))
