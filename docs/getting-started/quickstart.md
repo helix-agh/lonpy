@@ -158,7 +158,6 @@ viz = LONVisualizer()
 outputs = viz.visualize_all(
     lon,
     output_folder="./output",
-    create_gifs=True,
     seed=42
 )
 
