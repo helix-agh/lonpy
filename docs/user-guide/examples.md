@@ -98,7 +98,8 @@ for name, (func, lb, ub, optimal) in functions.items():
         "Optima": lon.n_vertices,
         "Funnels": metrics['n_funnels'],
         "Global Funnels": metrics['n_global_funnels'],
-        "Strength": f"{metrics['strength']:.1%}",
+        "Global Strength": f"{metrics['global_strength']:.1%}",
+        "Sink Strength": f"{metrics['sink_strength']:.1%}",
         "Global Funnel %": f"{cmlon_metrics['global_funnel_proportion']:.1%}",
     })
 
@@ -144,7 +145,8 @@ print(f"Local sinks:  {len(cmlon.get_local_sinks())}")
 cmlon_metrics = cmlon.compute_metrics()
 print("\n=== CMLON Metrics ===")
 print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
-print(f"Strength to global: {cmlon_metrics['strength']:.1%}")
+print(f"Global strength: {cmlon_metrics['global_strength']:.1%}")
+print(f"Sink strength: {cmlon_metrics['sink_strength']:.1%}")
 
 # Visualize
 viz = LONVisualizer()
@@ -196,7 +198,8 @@ print(f"Best fitness: {lon.best_fitness}")
 # Known optimum at x = (420.9687, ...) with f(x) ≈ 0
 metrics = lon.compute_metrics()
 print(f"Funnels: {metrics['n_funnels']}")
-print(f"Strength: {metrics['strength']:.1%}")
+print(f"Global strength: {metrics['global_strength']:.1%}")
+print(f"Sink strength: {metrics['sink_strength']:.1%}")
 ```
 
 ## Accessing Raw Trace Data

@@ -12,7 +12,7 @@ Data structures for Local Optima Networks.
 
 - [`LON`](lon.md#lonpy.lon.LON) - Local Optima Network representation
 - [`CMLON`](lon.md#lonpy.lon.CMLON) - Compressed Monotonic LON
-- `LONConfig` - Configuration for LON construction
+- [`LONConfig`](lon.md#lonpy.lon.LONConfig) - Configuration for LON construction
 
 ### [Sampling Module](sampling.md)
 

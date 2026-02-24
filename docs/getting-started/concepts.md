@@ -89,7 +89,8 @@ lonpy computes several metrics to characterize fitness landscapes:
 | `n_funnels` | Number of sinks (no outgoing edges) | Distinct attraction basins |
 | `n_global_funnels` | Sinks at global optimum | How many paths lead to success |
 | `neutral` | Proportion of equal-fitness connections | Landscape flatness |
-| `strength` | Incoming flow to global optima | Global optimum accessibility |
+| `global_strength` | Incoming flow to global optima relative to all nodes | Global optimum accessibility |
+| `sink_strength` | Incoming flow to global sinks relative to all sinks | Global sink dominance |
 | `success` | Proportion of runs reaching global optimum | Search algorithm effectiveness |
 | `deviation` | Mean absolute deviation from global optimum | Solution quality across runs |
 
@@ -98,13 +99,13 @@ lonpy computes several metrics to characterize fitness landscapes:
 **Easy landscape** (single funnel):
 
 - Few funnels (ideally 1)
-- High strength (most flow reaches global)
+- High global_strength and sink_strength (most flow reaches global)
 - All paths converge to global optimum
 
 **Hard landscape** (multiple funnels):
 
 - Many funnels competing for flow
-- Low strength (flow diverted to local sinks)
+- Low global_strength and sink_strength (flow diverted to local sinks)
 - Search easily gets trapped
 
 ## CMLON (Compressed Monotonic LON)

@@ -196,6 +196,41 @@ lon = compute_lon(
 )
 ```
 
+## Custom Initial Points
+
+By default, Basin-Hopping starts each run from a random point sampled uniformly from the domain. You can provide custom starting points via `initial_points`:
+
+```python
+import numpy as np
+from lonpy import compute_lon, BasinHoppingSampler, BasinHoppingSamplerConfig
+
+# Generate custom initial points (must have shape (n_runs, dim))
+n_runs = 30
+dim = 2
+initial_points = np.random.default_rng(0).uniform(-5.12, 5.12, size=(n_runs, dim))
+
+# With compute_lon
+lon = compute_lon(
+    func=my_objective,
+    dim=dim,
+    lower_bound=-5.12,
+    upper_bound=5.12,
+    n_runs=n_runs,
+    initial_points=initial_points,
+    seed=42
+)
+
+# Or with BasinHoppingSampler
+config = BasinHoppingSamplerConfig(n_runs=n_runs, seed=42)
+sampler = BasinHoppingSampler(config)
+lon = sampler.sample_to_lon(my_objective, domain, initial_points=initial_points)
+```
+
+**Requirements:**
+
+- Shape must be `(n_runs, dim)` — one point per run
+- When `bounded=True`, all points must lie within the domain bounds
+
 ## Domain Specification
 
 The domain is specified as a list of (lower, upper) tuples:

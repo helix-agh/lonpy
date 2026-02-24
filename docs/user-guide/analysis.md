@@ -83,20 +83,35 @@ print(f"Neutrality: {neutral:.1%}")
 - High % = Many plateaus or degenerate optima
 - Affects how CMLON compression works
 
-### strength
+### global_strength
 
-**Proportion of incoming edge weight to global optima.**
+**Proportion of global optima incoming strength to total incoming strength of all nodes.**
 
 ```python
-strength = lon_metrics['strength']
-print(f"Global strength: {strength:.1%}")
+global_strength = lon_metrics['global_strength']
+print(f"Global strength: {global_strength:.1%}")
 ```
 
 **Interpretation:**
 
 - 100% = All transitions flow toward global optimum
-- Low % = Most flow diverted to suboptimal sinks
+- Low % = Most flow diverted to suboptimal nodes
 - Key indicator of optimization difficulty
+
+### sink_strength
+
+**Proportion of global sinks incoming strength to incoming strength of all sink nodes.**
+
+```python
+sink_strength = lon_metrics['sink_strength']
+print(f"Sink strength: {sink_strength:.1%}")
+```
+
+**Interpretation:**
+
+- 100% = All sink-directed flow reaches global sinks
+- Low % = Most sink flow goes to local (suboptimal) sinks
+- Focuses specifically on competition between sinks
 
 ## Performance Metrics
 
@@ -214,10 +229,6 @@ names = lon.vertex_names
 sinks = lon.get_sinks()
 print(f"Sink indices: {sinks}")
 
-# Global optima
-global_idx = lon.get_global_optima_indices()
-print(f"Global optimum indices: {global_idx}")
-
 # For CMLON: separate global and local sinks
 global_sinks = cmlon.get_global_sinks()
 local_sinks = cmlon.get_local_sinks()
@@ -282,7 +293,7 @@ def classify_landscape(lon):
         return "Easy: Single-funnel landscape"
     elif cmlon_metrics['global_funnel_proportion'] > 0.8:
         return "Moderate: Multiple funnels but well-connected"
-    elif metrics['strength'] > 0.5:
+    elif metrics['global_strength'] > 0.5:
         return "Moderate: Good flow to global optimum"
     else:
         return "Hard: Multiple competing funnels"
