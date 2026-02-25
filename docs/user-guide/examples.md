@@ -98,6 +98,7 @@ for name, (func, lb, ub, optimal) in functions.items():
         "Global Funnels": metrics['n_global_funnels'],
         "Global Strength": f"{metrics['global_strength']:.1%}",
         "Sink Strength": f"{metrics['sink_strength']:.1%}",
+
         "Global Funnel %": f"{cmlon_metrics['global_funnel_proportion']:.1%}",
     })
 
