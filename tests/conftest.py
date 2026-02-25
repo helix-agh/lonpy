@@ -3,9 +3,13 @@ import pytest
 
 from lonpy import LON, BasinHoppingSampler, BasinHoppingSamplerConfig
 
-N_RUNS = 5
 SEED = 42
 DOMAIN_2D = [(-5.0, 5.0), (-5.0, 5.0)]
+DEFAULT_CONFIG = BasinHoppingSamplerConfig(
+    n_runs=5,
+    max_perturbations_without_improvement=50,
+    seed=SEED,
+)
 
 
 def sphere(x: np.ndarray) -> float:
@@ -19,22 +23,11 @@ def rastrigin(x: np.ndarray) -> float:
 
 @pytest.fixture(scope="session")
 def sphere_lon() -> LON:
-    config = BasinHoppingSamplerConfig(
-        n_runs=N_RUNS,
-        max_perturbations_without_improvement=50,
-        seed=SEED,
-    )
-    sampler = BasinHoppingSampler(config)
+    sampler = BasinHoppingSampler(DEFAULT_CONFIG)
     return sampler.sample_to_lon(sphere, DOMAIN_2D)
 
 
 @pytest.fixture(scope="session")
 def rastrigin_lon() -> LON:
-    """LON with multiple nodes, built from rastrigin function."""
-    config = BasinHoppingSamplerConfig(
-        n_runs=N_RUNS,
-        max_perturbations_without_improvement=50,
-        seed=SEED,
-    )
-    sampler = BasinHoppingSampler(config)
+    sampler = BasinHoppingSampler(DEFAULT_CONFIG)
     return sampler.sample_to_lon(rastrigin, DOMAIN_2D)

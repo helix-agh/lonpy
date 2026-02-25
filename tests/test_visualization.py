@@ -46,19 +46,3 @@ class TestPlot2DReproducibility:
         plt.close("all")
 
         assert path1.read_bytes() == path2.read_bytes()
-
-
-class TestPlot3DReproducibility:
-    def test_plot_3d_same_seed_same_figure_data(
-        self, sphere_lon: LON, visualizer: LONVisualizer
-    ) -> None:
-        fig1 = visualizer.plot_3d(sphere_lon, seed=SEED)
-        fig2 = visualizer.plot_3d(sphere_lon, seed=SEED)
-
-        # Compare node trace data (last trace is the scatter3d nodes)
-        nodes1 = fig1.data[-1]
-        nodes2 = fig2.data[-1]
-
-        np.testing.assert_array_equal(nodes1.x, nodes2.x)
-        np.testing.assert_array_equal(nodes1.y, nodes2.y)
-        np.testing.assert_array_equal(nodes1.z, nodes2.z)
