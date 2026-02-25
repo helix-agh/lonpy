@@ -53,7 +53,7 @@ lon = sampler.sample_to_lon(my_objective, domain)
 | `max_iter` | None | Max total perturbation steps per run. Use together with `n_iter_no_change` or alone. |
 | `seed` | None | Random seed for reproducibility |
 
-**Choosing n_runs and stopping criteria:**
+**Choosing `n_runs` and stopping criteria:**
 
 - More runs = better coverage of the landscape
 - `n_iter_no_change` counts *non-improving* consecutive steps - it is the primary stopping criterion per run
@@ -105,17 +105,30 @@ config = BasinHoppingSamplerConfig(
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `hash_digits` | 4 | Decimal places for node identification |
-| `opt_digits` | -1 | Decimal places for optimization (-1 = full) |
+| `coordinate_precision` | 5 | Decimal places for coordinate rounding and node identification (`None` = full double precision) |
+| `fitness_precision` | None | Decimal places for fitness values (`None` = full double precision) |
 
-**hash_digits** determines when two solutions are considered the same optimum:
+**coordinate_precision** determines when two solutions are considered the same optimum:
 
 ```python
 # High precision: More distinct nodes
-config = BasinHoppingSamplerConfig(hash_digits=6)
+config = BasinHoppingSamplerConfig(coordinate_precision=6)
 
 # Low precision: More merging, fewer nodes
-config = BasinHoppingSamplerConfig(hash_digits=2)
+config = BasinHoppingSamplerConfig(coordinate_precision=2)
+
+# Full precision: No rounding
+config = BasinHoppingSamplerConfig(coordinate_precision=None)
+```
+
+**fitness_precision** controls rounding of fitness values:
+
+```python
+# Round fitness to 4 decimal places
+config = BasinHoppingSamplerConfig(fitness_precision=4)
+
+# Full double precision (default)
+config = BasinHoppingSamplerConfig(fitness_precision=None)
 ```
 
 ### Local Minimizer Settings
@@ -136,6 +149,93 @@ config = BasinHoppingSamplerConfig(
     }
 )
 ```
+
+## LON Construction Configuration
+
+When constructing a LON from trace data, you can configure how duplicate nodes (nodes with multiple observed fitness values) are handled using `LONConfig`:
+
+```python
+from lonpy import LONConfig, BasinHoppingSampler, BasinHoppingSamplerConfig
+
+lon_config = LONConfig(
+    fitness_aggregation="min",       # How to resolve duplicate fitness values
+    warn_on_duplicates=True,         # Warn when duplicates detected
+    max_fitness_deviation=None,      # Error if deviation exceeds threshold
+)
+
+config = BasinHoppingSamplerConfig(n_runs=30, seed=42)
+sampler = BasinHoppingSampler(config)
+lon = sampler.sample_to_lon(my_objective, domain, lon_config=lon_config)
+```
+
+### Fitness Aggregation Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| `"min"` | Use minimum fitness (default) |
+| `"max"` | Use maximum fitness |
+| `"mean"` | Use average fitness |
+| `"first"` | Use first occurrence |
+| `"strict"` | Raise error if duplicates detected |
+
+### Data Quality Checks
+
+```python
+# Strict mode: fail if any node has multiple fitness values
+lon_config = LONConfig(fitness_aggregation="strict")
+
+# Set a maximum allowed deviation
+lon_config = LONConfig(max_fitness_deviation=0.01)
+```
+
+You can also pass `lon_config` to `compute_lon()`:
+
+```python
+from lonpy import compute_lon, LONConfig
+
+lon = compute_lon(
+    func=my_objective,
+    dim=2,
+    lower_bound=-5.0,
+    upper_bound=5.0,
+    lon_config=LONConfig(fitness_aggregation="mean"),
+)
+```
+
+## Custom Initial Points
+
+By default, Basin-Hopping starts each run from a random point sampled uniformly from the domain. You can provide custom starting points via `initial_points`:
+
+```python
+import numpy as np
+from lonpy import compute_lon, BasinHoppingSampler, BasinHoppingSamplerConfig
+
+# Generate custom initial points (must have shape (n_runs, dim))
+n_runs = 30
+dim = 2
+initial_points = np.random.default_rng(0).uniform(-5.12, 5.12, size=(n_runs, dim))
+
+# With compute_lon
+lon = compute_lon(
+    func=my_objective,
+    dim=dim,
+    lower_bound=-5.12,
+    upper_bound=5.12,
+    n_runs=n_runs,
+    initial_points=initial_points,
+    seed=42
+)
+
+# Or with BasinHoppingSampler
+config = BasinHoppingSamplerConfig(n_runs=n_runs, seed=42)
+sampler = BasinHoppingSampler(config)
+lon = sampler.sample_to_lon(my_objective, domain, initial_points=initial_points)
+```
+
+**Requirements:**
+
+- Shape must be `(n_runs, dim)` — one point per run
+- When `bounded=True`, all points must lie within the domain bounds
 
 ## Domain Specification
 
@@ -194,10 +294,10 @@ lon = sampler.sample_to_lon(func, domain, progress_callback=progress)
 # Rastrigin, Ackley, etc. with known bounds
 config = BasinHoppingSamplerConfig(
     n_runs=30,
-    n_iterations=500,
+    max_perturbations_without_improvement=500,
     step_mode="percentage",
     step_size=0.1,
-    hash_digits=4,
+    coordinate_precision=4,
     seed=42
 )
 ```
@@ -208,10 +308,10 @@ config = BasinHoppingSamplerConfig(
 # Start with wider exploration
 config = BasinHoppingSamplerConfig(
     n_runs=50,
-    n_iterations=200,
+    max_perturbations_without_improvement=200,
     step_mode="percentage",
-    step_size=0.15,  # Larger steps initially
-    hash_digits=3,   # Coarser grouping
+    step_size=0.15,            # Larger steps initially
+    coordinate_precision=3,    # Coarser grouping
 )
 
 # Refine based on initial results
@@ -223,7 +323,7 @@ config = BasinHoppingSamplerConfig(
 # More runs needed for coverage
 config = BasinHoppingSamplerConfig(
     n_runs=100,
-    n_iterations=500,
+    max_perturbations_without_improvement=500,
     step_mode="percentage",
     step_size=0.05,  # Smaller relative steps
 )

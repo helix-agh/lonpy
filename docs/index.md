@@ -34,7 +34,7 @@ Local Optima Networks (LONs) are graph-based models that capture the global stru
 
     ---
 
-    Compute landscape metrics including funnel analysis, neutrality measures, and global optima strength
+    Compute landscape metrics including funnel analysis, neutrality measures, and strength metrics (global and sink)
 
 - **Beautiful Visualizations**
 

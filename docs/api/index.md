@@ -12,6 +12,7 @@ Data structures for Local Optima Networks.
 
 - [`LON`](lon.md#lonpy.lon.LON) - Local Optima Network representation
 - [`CMLON`](lon.md#lonpy.lon.CMLON) - Compressed Monotonic LON
+- [`LONConfig`](lon.md#lonpy.lon.LONConfig) - Configuration for LON construction
 
 ### [Sampling Module](sampling.md)
 
@@ -80,16 +81,3 @@ viz.create_rotation_gif(lon, output_path="lon.gif")
 # All visualizations
 viz.visualize_all(lon, output_folder="./output")
 ```
-
-## Dependencies
-
-lonpy depends on:
-
-- `numpy` - Numerical computations
-- `scipy` - Optimization
-- `pandas` - Data handling
-- `igraph` - Graph operations
-- `matplotlib` - 2D plotting
-- `plotly` - 3D plotting
-- `imageio` - GIF creation
-- `kaleido` - Static image export

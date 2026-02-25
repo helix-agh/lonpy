@@ -517,7 +517,6 @@ class LONVisualizer:
         Args:
             lon: LON instance.
             output_folder: Output directory path.
-            create_gifs: Whether to create rotation GIFs (slower).
             seed: Random seed for reproducible layouts.
 
         Returns:

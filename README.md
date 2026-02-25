@@ -49,7 +49,7 @@ lon = compute_lon(
     lower_bound=-5.12,
     upper_bound=5.12,
     n_runs=20,
-    n_iterations=500,
+    max_perturbations_without_improvement=500,
     seed=42
 )
 
@@ -81,12 +81,13 @@ cmlon_metrics = cmlon.compute_metrics()
 from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 
 config = BasinHoppingSamplerConfig(
-    n_runs=50,              # Number of independent runs
-    n_iterations=1000,      # Iterations per run
-    step_size=0.05,         # Perturbation size
-    step_mode="per",        # "per" (percentage) or "fix" (fixed)
-    hash_digits=4,          # Precision for identifying optima
-    seed=42                 # For reproducibility
+    n_runs=50,                                  # Number of independent runs
+    max_perturbations_without_improvement=1000, # Stop after this many consecutive non-improving perturbations
+    step_size=0.05,                             # Perturbation size
+    step_mode="percentage",                     # "percentage" or "fixed"
+    coordinate_precision=4,                     # Precision for identifying optima
+    fitness_precision=None,                     # Precision for fitness values (None = full double)
+    seed=42                                     # For reproducibility
 )
 
 sampler = BasinHoppingSampler(config)
