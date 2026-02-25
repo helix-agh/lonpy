@@ -26,7 +26,7 @@ class FunctionConfig:
     func: Callable[[np.ndarray], float]
     bounds: tuple[float, float]
     step_size: float
-    max_perturbations_without_improvement: int
+    n_iter_no_change: int
     coordinate_precision: int = DEFAULT_COORDINATE_PRECISION
     dimensions: list[int] = field(default_factory=lambda: [3, 5, 8])
     best: float | None = None
@@ -45,7 +45,7 @@ def build_cmlon(
 
     config = BasinHoppingSamplerConfig(
         n_runs=n_runs,
-        max_perturbations_without_improvement=func_cfg.max_perturbations_without_improvement,
+        n_iter_no_change=func_cfg.n_iter_no_change,
         step_mode="fixed",
         step_size=func_cfg.step_size,
         fitness_precision=fitness_precision,
