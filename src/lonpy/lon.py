@@ -201,15 +201,9 @@ class LON:
         out_degrees = self.graph.degree(mode="out")
         return [i for i, d in enumerate(out_degrees) if d == 0]
 
-    def get_global_optima_indices(self) -> list[int]:
-        """Get indices of global optima nodes (nodes at best fitness)."""
-        return [
-            i for i, f in enumerate(self.vertex_fitness) if self._allclose(f, self.best_fitness)
-        ]
-
     def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
-        Compute LON metrics.
+        Compute LON network metrics.
 
         Args:
             known_best: Known global optimum value. If None, uses the best
@@ -221,7 +215,8 @@ class LON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of nodes with equal-fitness connections
-                - strength: Proportion of incoming strength to global optima
+                - global_strength: Proportion of global optima incoming strength to total incoming strength of all nodes
+                - sink_strength: Proportion of global sinks incoming strength to incoming strength of all sink nodes
         """
         best = known_best if known_best is not None else self.best_fitness
 
@@ -247,22 +242,40 @@ class LON:
         else:
             neutral = 0.0
 
-        # Strength: incoming strength to global optima
-        igs = self.get_global_optima_indices()
+        # Strength (global): incoming strength to global optima / total incoming strength
+        igs = [i for i, f in enumerate(self.vertex_fitness) if self._allclose(f, best)]
         if self.n_edges > 0 and igs:
             edge_weights = self.graph.es["Count"]
             stren_igs = sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights))
             stren_all = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
-            strength = round(stren_igs / stren_all, 4) if stren_all > 0 else 0.0
+            global_strength = round(stren_igs / stren_all, 4) if stren_all > 0 else 0.0
         else:
-            strength = 0.0
+            global_strength = 0.0
+
+        # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
+        global_sinks = [s for s in sinks_id if self._allclose(self.vertex_fitness[s], best)]
+        local_sinks = [s for s in sinks_id if not self._allclose(self.vertex_fitness[s], best)]
+        if self.n_edges > 0 and global_sinks:
+            edge_weights = self.graph.es["Count"]
+            sing = sum(
+                self.graph.strength(global_sinks, mode="in", loops=False, weights=edge_weights)
+            )
+            sinl = (
+                sum(self.graph.strength(local_sinks, mode="in", loops=False, weights=edge_weights))
+                if local_sinks
+                else 0
+            )
+            sink_strength = round(sing / (sing + sinl), 4) if (sing + sinl) > 0 else 0.0
+        else:
+            sink_strength = 0.0
 
         return {
             "n_optima": n_optima,
             "n_funnels": n_funnels,
             "n_global_funnels": n_global_funnels,
             "neutral": neutral,
-            "strength": strength,
+            "global_strength": global_strength,
+            "sink_strength": sink_strength,
         }
 
     def compute_performance_metrics(self, known_best: float | None = None) -> dict[str, Any]:
@@ -308,7 +321,7 @@ class LON:
 
         Returns:
             Dictionary containing all network and performance metrics:
-                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, strength
+                Network metrics: n_optima, n_funnels, n_global_funnels, neutral, global_strength, sink_strength
                 Performance metrics: success, deviation
         """
         network_metrics = self.compute_network_metrics(known_best)
@@ -465,7 +478,7 @@ class CMLON:
 
     def compute_network_metrics(self, known_best: float | None = None) -> dict[str, Any]:
         """
-        Compute CMLON metrics.
+        Compute CMLON network metrics.
 
         Args:
             known_best: Known global optimum value. If None, uses the best
@@ -477,7 +490,8 @@ class CMLON:
                 - n_funnels: Number of funnels (sinks)
                 - n_global_funnels: Number of funnels at global optimum
                 - neutral: Proportion of contracted nodes
-                - strength: Ratio of incoming strength to global vs local sinks
+                - global_strength: Proportion of global sinks incoming strength to total incoming strength of all nodes
+                - sink_strength: Proportion of global sinks incoming strength to incoming strength of all sink nodes
                 - global_funnel_proportion: Proportion of nodes that can reach
                   a global optimum
         """
@@ -497,20 +511,33 @@ class CMLON:
         else:
             neutral = 0.0
 
-        # Strength: normalised ratio of incoming strength to global
+        # Strength (global): incoming strength to global sinks / total incoming strength
         igs = [s for s, f in zip(sinks_id, sinks_fit) if self._allclose(f, best)]
+        ils = [s for s, f in zip(sinks_id, sinks_fit) if not self._allclose(f, best)]
 
         if self.n_edges > 0:
-            edge_weights = self.graph.es["Count"] if "Count" in self.graph.es.attributes() else None
+            edge_weights = self.graph.es["Count"]
             sing = (
                 sum(self.graph.strength(igs, mode="in", loops=False, weights=edge_weights))
                 if igs
                 else 0
             )
             total = sum(self.graph.strength(mode="in", loops=False, weights=edge_weights))
-            strength = round(sing / total, 4) if total > 0 else 0.0
+            global_strength = round(sing / total, 4) if total > 0 else 0.0
         else:
-            strength = 0.0
+            global_strength = 0.0
+
+        # Strength (sinks only): incoming strength to global sinks / incoming strength to all sinks
+        if self.n_edges > 0 and igs:
+            edge_weights = self.graph.es["Count"]
+            sinl = (
+                sum(self.graph.strength(ils, mode="in", loops=False, weights=edge_weights))
+                if ils
+                else 0
+            )
+            sink_strength = round(sing / (sing + sinl), 4) if (sing + sinl) > 0 else 0.0
+        else:
+            sink_strength = 0.0
 
         gfunnel = self._compute_global_funnel_proportion()
 
@@ -519,7 +546,8 @@ class CMLON:
             "n_funnels": n_funnels,
             "n_global_funnels": n_global_funnels,
             "neutral": neutral,
-            "strength": strength,
+            "global_strength": global_strength,
+            "sink_strength": sink_strength,
             "global_funnel_proportion": gfunnel,
         }
 
@@ -572,7 +600,7 @@ class CMLON:
         Returns:
             Dictionary containing all network and performance metrics:
                 Network metrics: n_optima, n_funnels, n_global_funnels, neutral,
-                    strength, global_funnel_proportion
+                    global_strength, sink_strength, global_funnel_proportion
                 Performance metrics: success, deviation (from source LON)
         """
         network_metrics = self.compute_network_metrics(known_best)
@@ -700,42 +728,3 @@ def _validate_duplicate_nodes(
             category=UserWarning,
             stacklevel=3,
         )
-
-
-def _simplify_with_edge_sum(graph: ig.Graph) -> ig.Graph:
-    """
-    Simplify graph by removing self-loops and combining parallel edges.
-
-    For parallel edges, sums the Count attribute.
-    """
-    # Remove self-loops
-    graph = graph.simplify(multiple=False, loops=True)
-
-    # Combine parallel edges
-    if graph.ecount() == 0:
-        return graph
-
-    edge_dict: dict[tuple[int, int], float] = {}
-    for edge in graph.es:
-        key = (edge.source, edge.target)
-        count = edge["Count"] if "Count" in edge.attributes() else 1
-        if key in edge_dict:
-            edge_dict[key] += count
-        else:
-            edge_dict[key] = count
-
-    # Rebuild graph with combined edges
-    new_graph = ig.Graph(directed=True)
-    new_graph.add_vertices(graph.vcount())
-
-    # Copy vertex attributes
-    for attr in graph.vs.attributes():
-        new_graph.vs[attr] = graph.vs[attr]
-
-    if edge_dict:
-        edges = list(edge_dict.keys())
-        counts = list(edge_dict.values())
-        new_graph.add_edges(edges)
-        new_graph.es["Count"] = counts
-
-    return new_graph
