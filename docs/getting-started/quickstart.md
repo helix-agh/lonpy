@@ -22,7 +22,7 @@ lon = compute_lon(
     lower_bound=-5.12,   # Search space lower bound
     upper_bound=5.12,    # Search space upper bound
     n_runs=20,           # Number of Basin-Hopping runs
-    n_iterations=500,    # Iterations per run
+    max_perturbations_without_improvement=500,  # Stop after this many consecutive non-improving perturbations
     seed=42              # For reproducibility
 )
 
@@ -43,7 +43,8 @@ print(f"Number of optima: {metrics['n_optima']}")
 print(f"Number of funnels: {metrics['n_funnels']}")
 print(f"Global funnels: {metrics['n_global_funnels']}")
 print(f"Neutrality: {metrics['neutral']:.1%}")
-print(f"Strength to global: {metrics['strength']:.1%}")
+print(f"Global strength: {metrics['global_strength']:.1%}")
+print(f"Sink strength: {metrics['sink_strength']:.1%}")
 ```
 
 **What do these metrics mean?**
@@ -54,7 +55,10 @@ print(f"Strength to global: {metrics['strength']:.1%}")
 | `n_funnels` | Number of sink nodes (basins of attraction) |
 | `n_global_funnels` | Funnels leading to the global optimum |
 | `neutral` | Proportion of nodes with equal-fitness neighbors |
-| `strength` | Proportion of flow directed toward global optima |
+| `global_strength` | Proportion of global optima incoming strength to total incoming strength |
+| `sink_strength` | Proportion of global sinks incoming strength to all sinks incoming strength |
+| `success` | Proportion of runs that reached the global optimum |
+| `deviation` | Mean absolute deviation from the global optimum |
 
 ## Visualizing the Network
 
@@ -136,7 +140,7 @@ lon = compute_lon(
     lower_bound=-5.12,
     upper_bound=5.12,
     n_runs=30,
-    n_iterations=500,
+    max_perturbations_without_improvement=500,
     seed=42
 )
 
@@ -154,7 +158,6 @@ viz = LONVisualizer()
 outputs = viz.visualize_all(
     lon,
     output_folder="./output",
-    create_gifs=True,
     seed=42
 )
 

@@ -20,7 +20,7 @@ lon = compute_lon(
     lower_bound=-5.12,
     upper_bound=5.12,
     n_runs=30,
-    n_iterations=500,
+    max_perturbations_without_improvement=500,
     seed=42
 )
 
@@ -85,20 +85,21 @@ for name, (func, lb, ub, optimal) in functions.items():
         lower_bound=lb,
         upper_bound=ub,
         n_runs=30,
-        n_iterations=500,
+        max_perturbations_without_improvement=500,
         seed=42
     )
 
-    metrics = lon.compute_metrics(known_best=optimal * 10**4)  # scaled
+    metrics = lon.compute_metrics(known_best=optimal)
     cmlon = lon.to_cmlon()
-    cmlon_metrics = cmlon.compute_metrics(known_best=optimal * 10**4)
+    cmlon_metrics = cmlon.compute_metrics(known_best=optimal)
 
     results.append({
         "Function": name,
         "Optima": lon.n_vertices,
         "Funnels": metrics['n_funnels'],
         "Global Funnels": metrics['n_global_funnels'],
-        "Strength": f"{metrics['strength']:.1%}",
+        "Global Strength": f"{metrics['global_strength']:.1%}",
+        "Sink Strength": f"{metrics['sink_strength']:.1%}",
         "Global Funnel %": f"{cmlon_metrics['global_funnel_proportion']:.1%}",
     })
 
@@ -144,7 +145,8 @@ print(f"Local sinks:  {len(cmlon.get_local_sinks())}")
 cmlon_metrics = cmlon.compute_metrics()
 print("\n=== CMLON Metrics ===")
 print(f"Global funnel proportion: {cmlon_metrics['global_funnel_proportion']:.1%}")
-print(f"Strength to global: {cmlon_metrics['strength']:.1%}")
+print(f"Global strength: {cmlon_metrics['global_strength']:.1%}")
+print(f"Sink strength: {cmlon_metrics['sink_strength']:.1%}")
 
 # Visualize
 viz = LONVisualizer()
@@ -165,11 +167,11 @@ def schwefel(x):
 
 # Custom configuration for challenging function
 config = BasinHoppingSamplerConfig(
-    n_runs=100,              # More runs for coverage
-    n_iterations=300,        # Moderate depth
+    n_runs=100,                                  # More runs for coverage
+    max_perturbations_without_improvement=300,    # Moderate depth
     step_mode="percentage",
-    step_size=0.15,          # Larger steps for this landscape
-    hash_digits=3,           # Coarser grouping
+    step_size=0.15,                              # Larger steps for this landscape
+    coordinate_precision=3,                      # Coarser grouping
     bounded=True,
     minimizer_method="L-BFGS-B",
     minimizer_options={
@@ -196,7 +198,8 @@ print(f"Best fitness: {lon.best_fitness}")
 # Known optimum at x = (420.9687, ...) with f(x) ≈ 0
 metrics = lon.compute_metrics()
 print(f"Funnels: {metrics['n_funnels']}")
-print(f"Strength: {metrics['strength']:.1%}")
+print(f"Global strength: {metrics['global_strength']:.1%}")
+print(f"Sink strength: {metrics['sink_strength']:.1%}")
 ```
 
 ## Accessing Raw Trace Data
@@ -209,7 +212,7 @@ from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 def sphere(x):
     return np.sum(x**2)
 
-config = BasinHoppingSamplerConfig(n_runs=5, n_iterations=100, seed=42)
+config = BasinHoppingSamplerConfig(n_runs=5, max_perturbations_without_improvement=100, seed=42)
 sampler = BasinHoppingSampler(config)
 
 domain = [(-5.0, 5.0), (-5.0, 5.0)]
@@ -290,7 +293,7 @@ def analyze_function(name, func, bounds, output_dir):
         lower_bound=bounds[0],
         upper_bound=bounds[1],
         n_runs=30,
-        n_iterations=500,
+        max_perturbations_without_improvement=500,
         seed=42
     )
 
