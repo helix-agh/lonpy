@@ -216,18 +216,17 @@ dim = 2
 initial_points = np.random.default_rng(0).uniform(-5.12, 5.12, size=(n_runs, dim))
 
 # With compute_lon
+config = BasinHoppingSamplerConfig(n_runs=n_runs, seed=42)
 lon = compute_lon(
     func=my_objective,
     dim=dim,
     lower_bound=-5.12,
     upper_bound=5.12,
-    n_runs=n_runs,
     initial_points=initial_points,
-    seed=42
+    config=config
 )
 
 # Or with BasinHoppingSampler
-config = BasinHoppingSamplerConfig(n_runs=n_runs, seed=42)
 sampler = BasinHoppingSampler(config)
 lon = sampler.sample_to_lon(my_objective, domain, initial_points=initial_points)
 ```
@@ -294,7 +293,7 @@ lon = sampler.sample_to_lon(func, domain, progress_callback=progress)
 # Rastrigin, Ackley, etc. with known bounds
 config = BasinHoppingSamplerConfig(
     n_runs=30,
-    max_perturbations_without_improvement=500,
+    n_iter_no_change=500,
     step_mode="percentage",
     step_size=0.1,
     coordinate_precision=4,
@@ -308,7 +307,7 @@ config = BasinHoppingSamplerConfig(
 # Start with wider exploration
 config = BasinHoppingSamplerConfig(
     n_runs=50,
-    max_perturbations_without_improvement=200,
+    n_iter_no_change=200,
     step_mode="percentage",
     step_size=0.15,            # Larger steps initially
     coordinate_precision=3,    # Coarser grouping
@@ -323,7 +322,7 @@ config = BasinHoppingSamplerConfig(
 # More runs needed for coverage
 config = BasinHoppingSamplerConfig(
     n_runs=100,
-    max_perturbations_without_improvement=500,
+    n_iter_no_change=500,
     step_mode="percentage",
     step_size=0.05,  # Smaller relative steps
 )
