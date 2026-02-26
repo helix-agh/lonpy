@@ -142,7 +142,7 @@ class BasinHoppingSampler:
         Args:
             func: Objective function to minimize (f: R^n_var -> R).
             domain: List of (lower, upper) bounds per dimension.
-            initial_points: Array of shape (n_runs, n_var) with initial points.
+            initial_points: Array of shape (config.n_runs, n_var) with initial points.
             progress_callback: Optional callback(run, total_runs) for progress.
 
         Returns:
@@ -345,7 +345,7 @@ class BasinHoppingSampler:
         Args:
             func: Objective function to minimize (f: R^n_var -> R).
             domain: List of (lower, upper) bounds per dimension.
-            initial_points: Optional array of shape (n_runs, n_var) with
+            initial_points: Optional array of shape (config.n_runs, n_var) with
                 starting points for each run. If None, points are sampled
                 uniformly at random from the domain.
             progress_callback: Optional callback(run, total_runs) for progress.
