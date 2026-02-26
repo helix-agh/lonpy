@@ -345,7 +345,7 @@ class BasinHoppingSampler:
         Args:
             func: Objective function to minimize (f: R^n_var -> R).
             domain: List of (lower, upper) bounds per dimension.
-            initial_points: Optional array of shape (config.n_runs, n_var) with
+            initial_points: Optional array of shape (`config.n_runs`, `n_var`) with
                 starting points for each run. If None, points are sampled
                 uniformly at random from the domain.
             progress_callback: Optional callback(run, total_runs) for progress.
@@ -408,7 +408,7 @@ def compute_lon(
         dim: Number of dimensions (n_var).
         lower_bound: Lower bound (scalar or per-dimension list/array).
         upper_bound: Upper bound (scalar or per-dimension list/array).
-        initial_points: Optional array of shape (n_runs, dim) with starting
+        initial_points: Optional array of shape (`config.n_runs`, `dim`) with starting
             points for each run. If None, points are sampled uniformly at
             random from the domain.
         config: Basin-Hopping sampler configuration. Uses default
