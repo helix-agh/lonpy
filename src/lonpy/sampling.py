@@ -27,9 +27,9 @@ class BasinHoppingSamplerConfig:
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
         n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
-            Use `None` for no limit Default: `1000`.
+            Use `None` for no limit. Setting both `n_iter_no_change` and `max_iter` to `None` will result in an error. Default: `1000`.
         max_iter: Optional maximum number of total iterations (perturbation steps) per run.
-            Use `None` for no limit. Default: `None`.
+            Use `None` for no limit. Setting both `n_iter_no_change` and `max_iter` to `None` will result in an error. Default: `None`.
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
