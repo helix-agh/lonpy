@@ -58,8 +58,8 @@ class BasinHoppingSamplerConfig:
     fitness_precision: int | None = None
     coordinate_precision: int | None = 5
     bounded: bool = True
-    minimizer_method: str = "L-BFGS-B"
-    minimizer_options: dict = field(
+    minimizer_method: str | Callable | None = "L-BFGS-B"
+    minimizer_options: dict | None = field(
         default_factory=lambda: {"ftol": 1e-07, "gtol": 0, "maxiter": 15000}
     )
     seed: int | None = None
