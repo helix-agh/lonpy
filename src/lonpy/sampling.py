@@ -26,16 +26,18 @@ class BasinHoppingSamplerConfig:
 
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
-        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run. Use None for no limit.
-        max_iter: Optional maximum number of total iterations (perturbation steps) per run. Use None for no limit.
+        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
+            Use `None` for no limit Default: `1000`.
+        max_iter: Optional maximum number of total iterations (perturbation steps) per run.
+            Use `None` for no limit. Default: `None`.
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
         fitness_precision: Decimal precision for fitness values.
-            Use None for full double precision. Passing negative values behaves the same as passing None.
+            Use `None` for full double precision. Passing negative values behaves the same as passing `None`.
         coordinate_precision: Decimal precision for coordinate rounding and hashing.
             Solutions rounded to this precision are considered identical.
-            Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
+            Use `None` for full double precision (no rounding). Passing negative values behaves the same as passing `None`.
         bounded: Whether to enforce domain bounds during perturbation.
         minimizer_method: Minimization method passed to ``scipy.optimize.minimize``. Can be a
             string or a callable implementing a custom solver.
@@ -44,6 +46,7 @@ class BasinHoppingSamplerConfig:
         minimizer_options: Solver-specific options passed as the ``options`` argument to
             ``scipy.optimize.minimize``. The available keys depend on the chosen
             ``minimizer_method``. Use ``None`` to rely on scipy's defaults.
+            Default: `{"ftol": 1e-07, "gtol": 0, "maxiter": 15000}`.
         seed: Random seed for reproducibility.
     """
 
