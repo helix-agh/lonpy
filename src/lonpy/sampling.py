@@ -17,28 +17,21 @@ class BasinHoppingSamplerConfig:
     """
     Configuration for Basin-Hopping sampling.
 
-    Default values have been set to match the paper
-      Jason Adair, Gabriela Ochoa, and Katherine M. Malan. 2019.
-      Local optima networks for continuous fitness landscapes.
-      In Proceedings of the Genetic and Evolutionary Computation Conference Companion (GECCO '19).
-      Association for Computing Machinery, New York, NY, USA, 1407-1414.
-      https://doi.org/10.1145/3319619.3326852
-
     Attributes:
-        n_runs: Number of independent Basin-Hopping runs.
-        max_perturbations_without_improvement: Number of perturbations without improvement before stopping.
-        step_mode: Perturbation mode - "percentage" (of domain range)
-            or "fixed" (absolute step size).
-        step_size: Perturbation magnitude (interpretation depends on step_mode).
+        n_runs: Number of independent Basin-Hopping runs. Default: `100`.
+        max_perturbations_without_improvement: Number of perturbations without improvement before stopping. Default: `1000`.
+        step_mode: Perturbation mode - `"percentage"` (of domain range)
+            or `"fixed"` (absolute step size). Default: `"fixed"`.
+        step_size: Perturbation magnitude (interpretation depends on step_mode). Default: `0.01`.
         fitness_precision: Decimal precision for fitness values.
-            Use None for full double precision. Passing negative values behaves the same as passing None.
+            Use `None` for full double precision. Passing negative values behaves the same as passing `None`. Default: `None`.
         coordinate_precision: Decimal precision for coordinate rounding and hashing.
             Solutions rounded to this precision are considered identical.
-            Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
-        bounded: Whether to enforce domain bounds during perturbation.
-        minimizer_method: Scipy minimizer method (default: "L-BFGS-B").
-        minimizer_options: Options passed to scipy.optimize.minimize.
-        seed: Random seed for reproducibility.
+            Use `None` for full double precision (no rounding). Passing negative values behaves the same as passing `None`. Default: `5`.
+        bounded: Whether to enforce domain bounds during perturbation. Default: `True`.
+        minimizer_method: Scipy minimizer method. Default: `"L-BFGS-B"`.
+        minimizer_options: Options passed to scipy.optimize.minimize. Default: `{"ftol": 1e-07, "gtol": 0, "maxiter": 15000}`.
+        seed: Random seed for reproducibility. Default: `None`.
     """
 
     n_runs: int = 100
@@ -236,7 +229,7 @@ class BasinHoppingSampler:
             raw_records: List of raw sampling records from basin hopping.
 
         Returns:
-            DataFrame with columns [run, fit1, node1, fit2, node2] representing
+            DataFrame with columns `[run, fit1, node1, fit2, node2]` representing
             actual transitions from current_x to new_x for each accepted move.
         """
         trace_records = []
@@ -288,7 +281,7 @@ class BasinHoppingSampler:
 
         if initial_points.ndim != 2 or initial_points.shape[1] != n_var:
             raise ValueError(
-                f"initial_points must have shape (n_runs, {n_var}), " f"got {initial_points.shape}."
+                f"initial_points must have shape (n_runs, {n_var}), got {initial_points.shape}."
             )
 
         if initial_points.shape[0] != n_runs:
@@ -324,13 +317,13 @@ class BasinHoppingSampler:
             func: Objective function to minimize (f: R^n_var -> R).
             domain: List of (lower, upper) bounds per dimension.
             initial_points: Optional array of shape (n_runs, n_var) with
-                starting points for each run. If None, points are sampled
+                starting points for each run. If `None`, points are sampled
                 uniformly at random from the domain.
             progress_callback: Optional callback(run, total_runs) for progress.
 
         Returns:
             Tuple of (trace_df, raw_records):
-                - trace_df: DataFrame with columns [run, fit1, node1, fit2, node2]
+                - trace_df: DataFrame with columns `[run, fit1, node1, fit2, node2]`
                 - raw_records: List of dicts with detailed iteration data.
         """
         resolved_points = self._resolve_initial_points(initial_points, domain)
@@ -393,17 +386,18 @@ def compute_lon(
         dim: Number of dimensions (n_var).
         lower_bound: Lower bound (scalar or per-dimension list/array).
         upper_bound: Upper bound (scalar or per-dimension list/array).
-        seed: Random seed for reproducibility.
-        step_size: Perturbation step size.
-        step_mode: "percentage" (of domain) or "fixed".
-        n_runs: Number of independent Basin-Hopping runs.
-        max_perturbations_without_improvement: Maximum number of consecutive non-improving perturbations before stopping each run.
-        fitness_precision: Decimal precision for fitness values (None for full double). Passing negative values behaves the same as passing None.
-        coordinate_precision: Decimal precision for coordinate hashing (None for no rounding). Passing negative values behaves the same as passing None.
-        bounded: Whether to enforce domain bounds.
+        seed: Random seed for reproducibility. Default: `None`.
+        step_size: Perturbation step size. Default: `0.01`.
+        step_mode: `"percentage"` (of domain) or `"fixed"`. Default: `"fixed"`.
+        n_runs: Number of independent Basin-Hopping runs. Default: `100`.
+        max_perturbations_without_improvement: Maximum number of consecutive non-improving perturbations before stopping each run. Default: `1000`.
+        fitness_precision: Decimal precision for fitness values (`None` for full double). Passing negative values behaves the same as passing `None`. Default: `None`.
+        coordinate_precision: Decimal precision for coordinate hashing (`None` for no rounding). Passing negative values behaves the same as passing `None`. Default: `5`.
+        bounded: Whether to enforce domain bounds. Default: `True`.
         initial_points: Optional array of shape (n_runs, dim) with starting
-            points for each run. If None, points are sampled uniformly at
-            random from the domain.
+            points for each run. If `None`, points are sampled uniformly at
+            random from the domain. Default: `None`.
+        lon_config: Optional LON construction configuration. Default: `None`.
 
     Returns:
         LON instance.
