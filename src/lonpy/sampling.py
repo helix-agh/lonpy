@@ -65,7 +65,7 @@ class BasinHoppingSamplerConfig:
     seed: int | None = None
 
     def __post_init__(self) -> None:
-        if self.n_iter_no_change <= 0:
+        if self.n_iter_no_change is not None and self.n_iter_no_change <= 0:
             raise ValueError("n_iter_no_change must be positive or None.")
         if self.max_iter is not None and self.max_iter <= 0:
             raise ValueError("max_iter must be positive or None.")
