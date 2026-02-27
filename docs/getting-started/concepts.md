@@ -110,9 +110,7 @@ lonpy computes several metrics to characterize fitness landscapes:
 
 ## CMLON (Compressed Monotonic LON)
 
-The **Compressed Monotonic LON (CMLON)** simplifies the network by:
-
-1. **Contracting neutral components**: Merge nodes with equal fitness that are connected via equal-fitness edges
+The **Compressed Monotonic LON (CMLON)** simplifies the network by merging nodes with equal fitness that are connected via equal-fitness edges.
 
 This reveals the "downhill" structure of the landscape:
 
