@@ -7,15 +7,15 @@ This guide covers how to configure Basin-Hopping sampling for LON construction.
 The simplest way to create a LON:
 
 ```python
-from lonpy import compute_lon
+from lonpy import compute_lon, BasinHoppingSamplerConfig
 
+config = BasinHoppingSamplerConfig(n_runs=20, seed=42)
 lon = compute_lon(
     func=my_objective,
     dim=2,
     lower_bound=-5.0,
     upper_bound=5.0,
-    n_runs=20,
-    seed=42
+    config=config
 )
 ```
 
@@ -27,13 +27,13 @@ For more control, use `BasinHoppingSamplerConfig`:
 from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 
 config = BasinHoppingSamplerConfig(
-    n_runs=30,                                  # Number of independent runs
-    max_perturbations_without_improvement=500,  # Stop after this many consecutive non-improving perturbations
-    step_mode="percentage",                     # "percentage" or "fixed"
-    step_size=0.1,                              # Perturbation magnitude
-    coordinate_precision=4,                     # Precision for node identification (None = full)
-    fitness_precision=None,                     # Precision for fitness values (None = full)
-    bounded=True,                               # Enforce domain bounds
+    n_runs=30,                  # Number of independent runs
+    n_iter_no_change=500,       # Max consecutive non-improving steps before stopping
+    step_mode="percentage",     # "percentage" or "fixed"
+    step_size=0.1,              # Perturbation magnitude
+    coordinate_precision=5,     # Decimal places for node identification
+    fitness_precision=None,     # Decimal places for fitness (None = full precision)
+    bounded=True,               # Enforce domain bounds
     minimizer_method="L-BFGS-B",
     seed=42
 )
@@ -49,20 +49,26 @@ lon = sampler.sample_to_lon(my_objective, domain)
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `n_runs` | 100 | Number of independent Basin-Hopping runs |
-| `max_perturbations_without_improvement` | 1000 | Consecutive non-improving perturbations before stopping a run |
+| `n_iter_no_change` | 1000 | Max consecutive non-improving perturbations before stopping each run. At least one of `n_iter_no_change` or `max_iter` must be set. |
+| `max_iter` | None | Max total perturbation steps per run. Use together with `n_iter_no_change` or alone. |
 | `seed` | None | Random seed for reproducibility |
 
-**Choosing n_runs and max_perturbations_without_improvement:**
+**Choosing `n_runs` and stopping criteria:**
 
 - More runs = better coverage of the landscape
-- Higher `max_perturbations_without_improvement` = deeper exploitation from each starting point (each run continues until this many consecutive perturbations fail to improve)
+- `n_iter_no_change` counts *non-improving* consecutive steps - it is the primary stopping criterion per run
+- `max_iter` caps total steps regardless of improvement - useful to bound computation time
+- At least one of the two must be set; they can be combined
 
 ```python
 # Wide coverage (recommended for unknown landscapes)
-config = BasinHoppingSamplerConfig(n_runs=50, max_perturbations_without_improvement=200)
+config = BasinHoppingSamplerConfig(n_runs=50, n_iter_no_change=200)
 
 # Deep exploration (for complex local structure)
-config = BasinHoppingSamplerConfig(n_runs=10, max_perturbations_without_improvement=1000)
+config = BasinHoppingSamplerConfig(n_runs=10, n_iter_no_change=1000)
+
+# Hard cap on total iterations regardless of improvement
+config = BasinHoppingSamplerConfig(n_runs=10, n_iter_no_change=None, max_iter=5000)
 ```
 
 ### Perturbation Settings
@@ -210,18 +216,17 @@ dim = 2
 initial_points = np.random.default_rng(0).uniform(-5.12, 5.12, size=(n_runs, dim))
 
 # With compute_lon
+config = BasinHoppingSamplerConfig(n_runs=n_runs, seed=42)
 lon = compute_lon(
     func=my_objective,
     dim=dim,
     lower_bound=-5.12,
     upper_bound=5.12,
-    n_runs=n_runs,
     initial_points=initial_points,
-    seed=42
+    config=config
 )
 
 # Or with BasinHoppingSampler
-config = BasinHoppingSamplerConfig(n_runs=n_runs, seed=42)
 sampler = BasinHoppingSampler(config)
 lon = sampler.sample_to_lon(my_objective, domain, initial_points=initial_points)
 ```
@@ -288,7 +293,7 @@ lon = sampler.sample_to_lon(func, domain, progress_callback=progress)
 # Rastrigin, Ackley, etc. with known bounds
 config = BasinHoppingSamplerConfig(
     n_runs=30,
-    max_perturbations_without_improvement=500,
+    n_iter_no_change=500,
     step_mode="percentage",
     step_size=0.1,
     coordinate_precision=4,
@@ -302,7 +307,7 @@ config = BasinHoppingSamplerConfig(
 # Start with wider exploration
 config = BasinHoppingSamplerConfig(
     n_runs=50,
-    max_perturbations_without_improvement=200,
+    n_iter_no_change=200,
     step_mode="percentage",
     step_size=0.15,            # Larger steps initially
     coordinate_precision=3,    # Coarser grouping
@@ -317,7 +322,7 @@ config = BasinHoppingSamplerConfig(
 # More runs needed for coverage
 config = BasinHoppingSamplerConfig(
     n_runs=100,
-    max_perturbations_without_improvement=500,
+    n_iter_no_change=500,
     step_mode="percentage",
     step_size=0.05,  # Smaller relative steps
 )

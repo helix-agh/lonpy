@@ -5,10 +5,11 @@ This guide covers how to create visualizations of Local Optima Networks.
 ## Quick Start
 
 ```python
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 # Build a LON
-lon = compute_lon(my_func, dim=2, lower_bound=-5, upper_bound=5, n_runs=20)
+lon = compute_lon(my_func, dim=2, lower_bound=-5, upper_bound=5,
+                 config=BasinHoppingSamplerConfig(n_runs=20))
 
 # Create visualizer
 viz = LONVisualizer()
@@ -89,11 +90,11 @@ viz.create_rotation_gif(
 
 ### GIF Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `duration` | 3.0 | Animation length in seconds |
-| `fps` | 10 | Frames per second |
-| `loop` | 0 | Loop count (0 = infinite) |
+| Parameter  | Default | Description                 |
+| ---------- | ------- | --------------------------- |
+| `duration` | 3.0     | Animation length in seconds |
+| `fps`      | 10      | Frames per second           |
+| `loop`     | 0       | Loop count (0 = infinite)   |
 
 ## Generate All Visualizations
 

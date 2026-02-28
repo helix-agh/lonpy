@@ -17,19 +17,19 @@ FUNCTIONS = {
         func=ackley4,
         bounds=(-35, 35),
         step_size=1.631,
-        max_perturbations_without_improvement=300,
+        n_iter_no_change=300,
     ),
     "Griewank": FunctionConfig(
         func=griewank,
         bounds=(-200, 200),
         step_size=3.6,
-        max_perturbations_without_improvement=200,
+        n_iter_no_change=200,
     ),
     "Schwefel 2.26": FunctionConfig(
         func=schwefel2_26,
         bounds=(-500, 500),
         step_size=151.0,
-        max_perturbations_without_improvement=4000,
+        n_iter_no_change=4000,
     ),
 }
 
