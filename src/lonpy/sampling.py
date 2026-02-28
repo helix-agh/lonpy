@@ -25,13 +25,13 @@ class BasinHoppingSamplerConfig:
             Use `None` for no limit. Setting both `n_iter_no_change` and `max_iter` to `None` will result in an error. Default: `None`.
         step_mode: Perturbation mode - `"percentage"` (of domain range)
             or `"fixed"` (absolute step size). Default: `"fixed"`.
-        step_size: Perturbation magnitude (interpretation depends on step_mode).
+        step_size: Perturbation magnitude (interpretation depends on step_mode). Default: `0.01`.
         fitness_precision: Decimal precision for fitness values.
             Use `None` for full double precision. Passing negative values behaves the same as passing `None`. Default: `None`.
         coordinate_precision: Decimal precision for coordinate rounding and hashing.
             Solutions rounded to this precision are considered identical.
             Use `None` for full double precision (no rounding). Passing negative values behaves the same as passing `None`. Default: `5`.
-        bounded: Whether to enforce domain bounds during perturbation. Default: `True`,
+        bounded: Whether to enforce domain bounds during perturbation. Default: `True`.
         minimizer_method: Minimization method passed to ``scipy.optimize.minimize``. Can be a
             string or a callable implementing a custom solver.
             See `scipy.optimize.minimize <https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>`_
@@ -370,6 +370,26 @@ class BasinHoppingSampler:
         progress_callback: Callable[[int, int], None] | None = None,
         lon_config: LONConfig | None = None,
     ) -> LON:
+        """
+        Run Basin-Hopping sampling and construct a LON.
+
+        Convenience wrapper that calls `sample()` and passes the resulting
+        trace data to `LON.from_trace_data()`. Equivalent to calling
+        `sample()` followed by `LON.from_trace_data(trace_df, config=lon_config)`.
+
+        Args:
+            func: Objective function to minimize (f: R^n_var -> R).
+            domain: List of (lower, upper) bounds per dimension.
+            initial_points: Optional array of shape (`config.n_runs`, `n_var`) with
+                starting points for each run. If `None`, points are sampled
+                uniformly at random from the domain. Default: `None`.
+            progress_callback: Optional callback(run, total_runs) for progress. Default: `None`.
+            lon_config: LON construction configuration. If `None`, uses default
+                `LONConfig`. Default: `None`.
+
+        Returns:
+            `LON` instance constructed from the sampling trace.
+        """
         trace_df, _ = self.sample(func, domain, initial_points, progress_callback)
 
         if trace_df.empty:

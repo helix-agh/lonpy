@@ -44,7 +44,7 @@ class LON:
     represent transitions between them discovered during basin-hopping search.
 
     Attributes:
-        graph: The underlying `igraph` Graph object. Default: `None`.
+        graph: The underlying `igraph` Graph object. Default: empty directed `ig.Graph`.
         best_fitness: The best (minimum) fitness value found. Default: `None`.
         final_run_values: `Series` mapping run number to final fitness value. Default: `None`.
         eq_atol: Tolerance for considering fitness values as equal. Default: `1e-12`.
