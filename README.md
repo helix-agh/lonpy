@@ -36,21 +36,24 @@ pip install -e .
 
 ```python
 import numpy as np
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 # Define an objective function
 def rastrigin(x: np.ndarray) -> float:
     return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 # Construct the LON
+config = BasinHoppingSamplerConfig(
+    n_runs=20,
+    n_iter_no_change=500,
+    seed=42
+)
 lon = compute_lon(
     rastrigin,
     dim=2,
     lower_bound=-5.12,
     upper_bound=5.12,
-    n_runs=20,
-    max_perturbations_without_improvement=500,
-    seed=42
+    config=config
 )
 
 metrics = lon.compute_metrics()
@@ -81,13 +84,13 @@ cmlon_metrics = cmlon.compute_metrics()
 from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 
 config = BasinHoppingSamplerConfig(
-    n_runs=50,                                  # Number of independent runs
-    max_perturbations_without_improvement=1000, # Stop after this many consecutive non-improving perturbations
-    step_size=0.05,                             # Perturbation size
-    step_mode="percentage",                     # "percentage" or "fixed"
-    coordinate_precision=4,                     # Precision for identifying optima
-    fitness_precision=None,                     # Precision for fitness values (None = full double)
-    seed=42                                     # For reproducibility
+    n_runs=50,                   # Number of independent runs
+    n_iter_no_change=1000,       # Stop after this many consecutive non-improving perturbations
+    step_size=0.05,              # Perturbation size
+    step_mode="percentage",      # "percentage" or "fixed"
+    coordinate_precision=4,      # Precision for identifying optima
+    fitness_precision=None,      # Precision for fitness values (None = full double)
+    seed=42                      # For reproducibility
 )
 
 sampler = BasinHoppingSampler(config)

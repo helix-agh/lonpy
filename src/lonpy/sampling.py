@@ -26,33 +26,53 @@ class BasinHoppingSamplerConfig:
 
     Attributes:
         n_runs: Number of independent Basin-Hopping runs.
-        max_perturbations_without_improvement: Number of perturbations without improvement before stopping.
+        n_iter_no_change: Maximum number of consecutive non-improving perturbations before stopping each run.
+            Use `None` for no limit. Setting both `n_iter_no_change` and `max_iter` to `None` will result in an error. Default: `1000`.
+        max_iter: Optional maximum number of total iterations (perturbation steps) per run.
+            Use `None` for no limit. Setting both `n_iter_no_change` and `max_iter` to `None` will result in an error. Default: `None`.
         step_mode: Perturbation mode - "percentage" (of domain range)
             or "fixed" (absolute step size).
         step_size: Perturbation magnitude (interpretation depends on step_mode).
         fitness_precision: Decimal precision for fitness values.
-            Use None for full double precision. Passing negative values behaves the same as passing None.
+            Use `None` for full double precision. Passing negative values behaves the same as passing `None`.
         coordinate_precision: Decimal precision for coordinate rounding and hashing.
             Solutions rounded to this precision are considered identical.
-            Use None for full double precision (no rounding). Passing negative values behaves the same as passing None.
+            Use `None` for full double precision (no rounding). Passing negative values behaves the same as passing `None`.
         bounded: Whether to enforce domain bounds during perturbation.
-        minimizer_method: Scipy minimizer method (default: "L-BFGS-B").
-        minimizer_options: Options passed to scipy.optimize.minimize.
+        minimizer_method: Minimization method passed to ``scipy.optimize.minimize``. Can be a
+            string or a callable implementing a custom solver.
+            See `scipy.optimize.minimize <https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html>`_
+            for the full list of supported methods and their options (default: ``"L-BFGS-B"``).
+        minimizer_options: Solver-specific options passed as the ``options`` argument to
+            ``scipy.optimize.minimize``. The available keys depend on the chosen
+            ``minimizer_method``. Use ``None`` to rely on scipy's defaults.
+            Default: `{"ftol": 1e-07, "gtol": 0, "maxiter": 15000}`.
         seed: Random seed for reproducibility.
     """
 
     n_runs: int = 100
-    max_perturbations_without_improvement: int = 1000
+    n_iter_no_change: int | None = 1000
+    max_iter: int | None = None
     step_mode: StepMode = "fixed"
     step_size: float = 0.01
     fitness_precision: int | None = None
     coordinate_precision: int | None = 5
     bounded: bool = True
-    minimizer_method: str = "L-BFGS-B"
-    minimizer_options: dict = field(
+    minimizer_method: str | Callable | None = "L-BFGS-B"
+    minimizer_options: dict | None = field(
         default_factory=lambda: {"ftol": 1e-07, "gtol": 0, "maxiter": 15000}
     )
     seed: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.n_iter_no_change is not None and self.n_iter_no_change <= 0:
+            raise ValueError("n_iter_no_change must be positive or None.")
+        if self.max_iter is not None and self.max_iter <= 0:
+            raise ValueError("max_iter must be positive or None.")
+        if self.n_iter_no_change is None and self.max_iter is None:
+            raise ValueError(
+                "At least one stopping criterion must be set: n_iter_no_change and/or max_iter."
+            )
 
 
 class BasinHoppingSampler:
@@ -64,7 +84,7 @@ class BasinHoppingSampler:
     transitions between local optima for LON construction.
 
     Example:
-        >>> config = BasinHoppingSamplerConfig(n_runs=10, max_perturbations_without_improvement=1000)
+        >>> config = BasinHoppingSamplerConfig(n_runs=10, n_iter_no_change=1000)
         >>> sampler = BasinHoppingSampler(config)
         >>> lon = sampler.sample_to_lon(objective_func, domain)
     """
@@ -126,7 +146,7 @@ class BasinHoppingSampler:
         Args:
             func: Objective function to minimize (f: R^n_var -> R).
             domain: List of (lower, upper) bounds per dimension.
-            initial_points: Array of shape (n_runs, n_var) with initial points.
+            initial_points: Array of shape (config.n_runs, n_var) with initial points.
             progress_callback: Optional callback(run, total_runs) for progress.
 
         Returns:
@@ -169,13 +189,18 @@ class BasinHoppingSampler:
             current_x = res.x
             current_f = res.fun
 
-            perturbations_without_improvement = 0
-            run_index = 0
+            iters_without_improvement = 0
+            iter_index = 0
 
-            while (
-                perturbations_without_improvement
-                < self.config.max_perturbations_without_improvement
-            ):
+            while True:
+                if self.config.max_iter is not None and iter_index >= self.config.max_iter:
+                    break
+                if (
+                    self.config.n_iter_no_change is not None
+                    and iters_without_improvement >= self.config.n_iter_no_change
+                ):
+                    break
+
                 x_perturbed = self._perturbation(current_x, p, bounds_array)
                 try:
                     res = minimize(
@@ -190,13 +215,13 @@ class BasinHoppingSampler:
                     # violate bounds, causing approx_derivative to fail.
                     # Skip this perturbation and try the next one.
                     warnings.warn(
-                        f"Run {run}, iteration {run_index}: minimize after perturbation "
+                        f"Run {run}, iteration {iter_index}: minimize after perturbation "
                         f"failed with ValueError: {e}. "
                         f"Perturbed point: {x_perturbed}. Skipping perturbation.",
                         stacklevel=3,
                     )
-                    perturbations_without_improvement += 1
-                    run_index += 1
+                    iters_without_improvement += 1
+                    iter_index += 1
                     continue
 
                 new_x = res.x
@@ -205,7 +230,7 @@ class BasinHoppingSampler:
                 raw_records.append(
                     {
                         "run": run,
-                        "iteration": run_index,
+                        "iteration": iter_index,
                         "current_x": current_x.copy(),
                         "current_f": current_f,
                         "new_x": new_x.copy(),
@@ -214,17 +239,18 @@ class BasinHoppingSampler:
                     }
                 )
 
-                if new_f < current_f:
-                    perturbations_without_improvement = 0
-                else:
-                    perturbations_without_improvement += 1
+                if self.config.n_iter_no_change is not None:
+                    if new_f < current_f:
+                        iters_without_improvement = 0
+                    else:
+                        iters_without_improvement += 1
 
                 # Acceptance criterion (minimization: accept if better or equal)
                 if new_f <= current_f:
                     current_x = new_x.copy()
                     current_f = new_f
 
-                run_index += 1
+                iter_index += 1
 
         return raw_records
 
@@ -288,7 +314,7 @@ class BasinHoppingSampler:
 
         if initial_points.ndim != 2 or initial_points.shape[1] != n_var:
             raise ValueError(
-                f"initial_points must have shape (n_runs, {n_var}), " f"got {initial_points.shape}."
+                f"initial_points must have shape (n_runs, {n_var}), got {initial_points.shape}."
             )
 
         if initial_points.shape[0] != n_runs:
@@ -323,7 +349,7 @@ class BasinHoppingSampler:
         Args:
             func: Objective function to minimize (f: R^n_var -> R).
             domain: List of (lower, upper) bounds per dimension.
-            initial_points: Optional array of shape (n_runs, n_var) with
+            initial_points: Optional array of shape (`config.n_runs`, `n_var`) with
                 starting points for each run. If None, points are sampled
                 uniformly at random from the domain.
             progress_callback: Optional callback(run, total_runs) for progress.
@@ -371,15 +397,8 @@ def compute_lon(
     dim: int,
     lower_bound: float | Sequence[float],
     upper_bound: float | Sequence[float],
-    seed: int | None = None,
-    step_size: float = 0.01,
-    step_mode: StepMode = "fixed",
-    n_runs: int = 100,
-    max_perturbations_without_improvement: int = 1000,
-    fitness_precision: int | None = None,
-    coordinate_precision: int | None = 5,
-    bounded: bool = True,
     initial_points: np.ndarray | None = None,
+    config: BasinHoppingSamplerConfig | None = None,
     lon_config: LONConfig | None = None,
 ) -> LON:
     """
@@ -393,17 +412,13 @@ def compute_lon(
         dim: Number of dimensions (n_var).
         lower_bound: Lower bound (scalar or per-dimension list/array).
         upper_bound: Upper bound (scalar or per-dimension list/array).
-        seed: Random seed for reproducibility.
-        step_size: Perturbation step size.
-        step_mode: "percentage" (of domain) or "fixed".
-        n_runs: Number of independent Basin-Hopping runs.
-        max_perturbations_without_improvement: Maximum number of consecutive non-improving perturbations before stopping each run.
-        fitness_precision: Decimal precision for fitness values (None for full double). Passing negative values behaves the same as passing None.
-        coordinate_precision: Decimal precision for coordinate hashing (None for no rounding). Passing negative values behaves the same as passing None.
-        bounded: Whether to enforce domain bounds.
-        initial_points: Optional array of shape (n_runs, dim) with starting
+        initial_points: Optional array of shape (`config.n_runs`, `dim`) with starting
             points for each run. If None, points are sampled uniformly at
             random from the domain.
+        config: Basin-Hopping sampler configuration. Uses default
+            BasinHoppingSamplerConfig if not provided.
+        lon_config: LON construction configuration.
+
 
     Returns:
         LON instance.
@@ -424,17 +439,6 @@ def compute_lon(
     )
 
     domain = list(zip(lower_bounds, upper_bounds, strict=True))
-
-    config = BasinHoppingSamplerConfig(
-        n_runs=n_runs,
-        max_perturbations_without_improvement=max_perturbations_without_improvement,
-        step_mode=step_mode,
-        step_size=step_size,
-        fitness_precision=fitness_precision,
-        coordinate_precision=coordinate_precision,
-        bounded=bounded,
-        seed=seed,
-    )
 
     sampler = BasinHoppingSampler(config)
     return sampler.sample_to_lon(func, domain, initial_points=initial_points, lon_config=lon_config)
