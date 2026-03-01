@@ -1,11 +1,7 @@
 from pathlib import Path
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-
-matplotlib.use("Agg")
-
 import pytest
 
 from lonpy import LON, LONVisualizer
