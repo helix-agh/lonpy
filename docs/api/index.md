@@ -33,7 +33,7 @@ Plotting and animation tools.
 ### Creating a LON
 
 ```python
-from lonpy import compute_lon
+from lonpy import compute_lon, BasinHoppingSamplerConfig
 
 # Simple usage
 lon = compute_lon(
@@ -41,8 +41,7 @@ lon = compute_lon(
     dim=2,
     lower_bound=-5.0,
     upper_bound=5.0,
-    n_runs=20,
-    seed=42
+    config=BasinHoppingSamplerConfig(n_runs=20, seed=42)
 )
 ```
 

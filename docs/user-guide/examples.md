@@ -6,7 +6,7 @@ Complete examples demonstrating lonpy's capabilities.
 
 ```python
 import numpy as np
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 # Define the Rastrigin function
 def rastrigin(x):
@@ -14,14 +14,13 @@ def rastrigin(x):
     return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 # Build the LON
+config = BasinHoppingSamplerConfig(n_runs=30, n_iter_no_change=500, seed=42)
 lon = compute_lon(
     func=rastrigin,
     dim=2,
     lower_bound=-5.12,
     upper_bound=5.12,
-    n_runs=30,
-    max_perturbations_without_improvement=500,
-    seed=42
+    config=config
 )
 
 # Analyze
@@ -48,7 +47,7 @@ viz.plot_3d(lon, output_path="rastrigin_3d.png", seed=42)
 ```python
 import numpy as np
 import pandas as pd
-from lonpy import compute_lon
+from lonpy import compute_lon, BasinHoppingSamplerConfig
 
 # Test functions
 def sphere(x):
@@ -79,14 +78,13 @@ results = []
 for name, (func, lb, ub, optimal) in functions.items():
     print(f"Analyzing {name}...")
 
+    config = BasinHoppingSamplerConfig(n_runs=30, n_iter_no_change=500, seed=42)
     lon = compute_lon(
         func=func,
         dim=2,
         lower_bound=lb,
         upper_bound=ub,
-        n_runs=30,
-        max_perturbations_without_improvement=500,
-        seed=42
+        config=config
     )
 
     metrics = lon.compute_metrics(known_best=optimal)
@@ -100,6 +98,7 @@ for name, (func, lb, ub, optimal) in functions.items():
         "Global Funnels": metrics['n_global_funnels'],
         "Global Strength": f"{metrics['global_strength']:.1%}",
         "Sink Strength": f"{metrics['sink_strength']:.1%}",
+
         "Global Funnel %": f"{cmlon_metrics['global_funnel_proportion']:.1%}",
     })
 
@@ -113,19 +112,19 @@ print(df.to_string(index=False))
 
 ```python
 import numpy as np
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 def rastrigin(x):
     return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 # Build LON
+config = BasinHoppingSamplerConfig(n_runs=50, seed=42)
 lon = compute_lon(
     rastrigin,
     dim=2,
     lower_bound=-5.12,
     upper_bound=5.12,
-    n_runs=50,
-    seed=42
+    config=config
 )
 
 # Convert to CMLON
@@ -167,11 +166,11 @@ def schwefel(x):
 
 # Custom configuration for challenging function
 config = BasinHoppingSamplerConfig(
-    n_runs=100,                                  # More runs for coverage
-    max_perturbations_without_improvement=300,    # Moderate depth
+    n_runs=100,              # More runs for coverage
+    n_iter_no_change=300,    # Stop after 300 non-improving steps
     step_mode="percentage",
-    step_size=0.15,                              # Larger steps for this landscape
-    coordinate_precision=3,                      # Coarser grouping
+    step_size=0.15,          # Larger steps for this landscape
+    coordinate_precision=3,  # Coarser grouping
     bounded=True,
     minimizer_method="L-BFGS-B",
     minimizer_options={
@@ -212,7 +211,7 @@ from lonpy import BasinHoppingSampler, BasinHoppingSamplerConfig
 def sphere(x):
     return np.sum(x**2)
 
-config = BasinHoppingSamplerConfig(n_runs=5, max_perturbations_without_improvement=100, seed=42)
+config = BasinHoppingSamplerConfig(n_runs=5, n_iter_no_change=100, seed=42)
 sampler = BasinHoppingSampler(config)
 
 domain = [(-5.0, 5.0), (-5.0, 5.0)]
@@ -240,12 +239,13 @@ print(f"\nAcceptance rate: {accepted/total:.1%}")
 
 ```python
 import numpy as np
-from lonpy import compute_lon
+from lonpy import compute_lon, BasinHoppingSamplerConfig
 
 def rastrigin(x):
     return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
-lon = compute_lon(rastrigin, dim=2, lower_bound=-5.12, upper_bound=5.12, n_runs=30, seed=42)
+lon = compute_lon(rastrigin, dim=2, lower_bound=-5.12, upper_bound=5.12,
+                  config=BasinHoppingSamplerConfig(n_runs=30, seed=42))
 
 # Access igraph object
 g = lon.graph
@@ -279,7 +279,7 @@ if g.ecount() > 0:
 import numpy as np
 import json
 from pathlib import Path
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 def analyze_function(name, func, bounds, output_dir):
     """Analyze a function and save results."""
@@ -287,14 +287,13 @@ def analyze_function(name, func, bounds, output_dir):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Build LON
+    config = BasinHoppingSamplerConfig(n_runs=30, n_iter_no_change=500, seed=42)
     lon = compute_lon(
         func=func,
         dim=2,
         lower_bound=bounds[0],
         upper_bound=bounds[1],
-        n_runs=30,
-        max_perturbations_without_improvement=500,
-        seed=42
+        config=config
     )
 
     # Compute metrics

@@ -8,7 +8,7 @@ Let's create a Local Optima Network for the classic Rastrigin function:
 
 ```python
 import numpy as np
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 # 1. Define your objective function
 def rastrigin(x):
@@ -16,14 +16,17 @@ def rastrigin(x):
     return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 # 2. Build the LON
+config = BasinHoppingSamplerConfig(
+    n_runs=20,            # Number of Basin-Hopping runs
+    n_iter_no_change=500, # Stop after 500 non-improving steps
+    seed=42               # For reproducibility
+)
 lon = compute_lon(
     func=rastrigin,      # Your objective function
     dim=2,               # Number of dimensions
     lower_bound=-5.12,   # Search space lower bound
     upper_bound=5.12,    # Search space upper bound
-    n_runs=20,           # Number of Basin-Hopping runs
-    max_perturbations_without_improvement=500,  # Stop after this many consecutive non-improving perturbations
-    seed=42              # For reproducibility
+    config=config
 )
 
 # 3. Explore the results
@@ -128,20 +131,19 @@ Here's a full script that generates all visualizations:
 
 ```python
 import numpy as np
-from lonpy import compute_lon, LONVisualizer
+from lonpy import compute_lon, LONVisualizer, BasinHoppingSamplerConfig
 
 def rastrigin(x):
     return 10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 # Build LON
+config = BasinHoppingSamplerConfig(n_runs=30, n_iter_no_change=500, seed=42)
 lon = compute_lon(
     rastrigin,
     dim=2,
     lower_bound=-5.12,
     upper_bound=5.12,
-    n_runs=30,
-    max_perturbations_without_improvement=500,
-    seed=42
+    config=config
 )
 
 # Print analysis

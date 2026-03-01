@@ -7,9 +7,10 @@ This guide explains how to analyze LONs and interpret the computed metrics.
 Both LON and CMLON provide a `compute_metrics()` method:
 
 ```python
-from lonpy import compute_lon
+from lonpy import compute_lon, BasinHoppingSamplerConfig
 
-lon = compute_lon(func, dim=2, lower_bound=-5, upper_bound=5, n_runs=30)
+lon = compute_lon(func, dim=2, lower_bound=-5, upper_bound=5,
+                  config=BasinHoppingSamplerConfig(n_runs=30))
 
 # LON metrics
 lon_metrics = lon.compute_metrics()
@@ -305,7 +306,7 @@ print(classify_landscape(lon))
 
 ```python
 import numpy as np
-from lonpy import compute_lon
+from lonpy import compute_lon, BasinHoppingSamplerConfig
 
 def sphere(x):
     return np.sum(x**2)
@@ -324,7 +325,8 @@ functions = {
 
 results = {}
 for name, (func, lb, ub) in functions.items():
-    lon = compute_lon(func, dim=2, lower_bound=lb, upper_bound=ub, n_runs=30, seed=42)
+    lon = compute_lon(func, dim=2, lower_bound=lb, upper_bound=ub,
+                      config=BasinHoppingSamplerConfig(n_runs=30, seed=42))
     results[name] = lon.compute_metrics()
     results[name]['n_vertices'] = lon.n_vertices
 
