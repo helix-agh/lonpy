@@ -7,7 +7,7 @@ SEED = 42
 DOMAIN_2D = [(-5.0, 5.0), (-5.0, 5.0)]
 DEFAULT_CONFIG = BasinHoppingSamplerConfig(
     n_runs=5,
-    max_perturbations_without_improvement=50,
+    max_iter=50,
     seed=SEED,
 )
 
