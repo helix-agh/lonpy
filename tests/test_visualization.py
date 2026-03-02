@@ -31,14 +31,26 @@ class TestLayoutReproducibility:
 
 class TestPlot2DReproducibility:
     def test_plot_2d_same_seed_same_figure(
+        self, sphere_lon: LON, visualizer: LONVisualizer
+    ) -> None:
+        fig1 = visualizer.plot_2d(sphere_lon, seed=SEED)
+        fig1.canvas.draw()
+        pixels1 = np.array(fig1.canvas.buffer_rgba())
+        plt.close(fig1)
+
+        fig2 = visualizer.plot_2d(sphere_lon, seed=SEED)
+        fig2.canvas.draw()
+        pixels2 = np.array(fig2.canvas.buffer_rgba())
+        plt.close(fig2)
+
+        np.testing.assert_array_equal(pixels1, pixels2)
+
+    def test_plot_2d_saves_to_file(
         self, sphere_lon: LON, visualizer: LONVisualizer, tmp_path: Path
     ) -> None:
-        path1 = tmp_path / "plot1.png"
-        path2 = tmp_path / "plot2.png"
-
-        visualizer.plot_2d(sphere_lon, output_path=path1, seed=SEED)
-        plt.close("all")
-        visualizer.plot_2d(sphere_lon, output_path=path2, seed=SEED)
+        output_path = tmp_path / "plot.png"
+        visualizer.plot_2d(sphere_lon, output_path=output_path, seed=SEED)
         plt.close("all")
 
-        assert path1.read_bytes() == path2.read_bytes()
+        assert output_path.exists()
+        assert output_path.stat().st_size > 0
