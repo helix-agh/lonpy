@@ -17,6 +17,8 @@ class StepSizeEstimatorConfig:
         n_perturbations: Perturbations per sample point.
         target_escape_rate: Target escape rate to find (0.5 = 50% of perturbations escape).
         search_precision: Decimal digits of precision for step size search.
+            The algorithm refines by dividing the increment by 10 each iteration,
+            so ``search_precision=4`` means 4 refinement rounds yielding resolution 0.0001.
         coordinate_precision: Precision for identifying distinct optima.
             Use None for full double precision.
         minimizer_method: Scipy minimizer method (default: "L-BFGS-B").
@@ -178,7 +180,7 @@ class StepSizeEstimator:
         last_tested: tuple[float, float] | None = None
 
         for _ in range(self.config.search_precision):
-            while step <= 1.0 + 1e-12:
+            while step <= 1.0 + 1e-12:  # epsilon to ensure step=1.0 is tested despite float drift
                 rate = self._compute_escape_rate(func, domain_array, step, sampler, rng)
                 last_tested = (step, rate)
 
