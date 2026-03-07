@@ -86,23 +86,45 @@ class BasinHoppingSampler:
         self.config = config or BasinHoppingSamplerConfig()
         self._rng = np.random.default_rng(self.config.seed)
 
-    def _perturbation(
+    def perturbation(
         self,
         x: np.ndarray,
         p: np.ndarray,
         bounds: np.ndarray | None = None,
     ) -> np.ndarray:
+        """
+        Apply a random uniform perturbation to a solution.
+
+        Args:
+            x: Current solution coordinates.
+            p: Per-dimension perturbation magnitude.
+            bounds: Optional (n_var, 2) array of domain bounds for clipping.
+
+        Returns:
+            Perturbed solution, clipped to bounds if ``bounded`` is enabled.
+        """
         y = x + self._rng.uniform(low=-p, high=p)
         if self.config.bounded and bounds is not None:
             return np.clip(y, bounds[:, 0], bounds[:, 1])
         return y
 
-    def _round_value(self, value: np.ndarray, precision: int | None) -> np.ndarray:
+    def round_value(self, value: np.ndarray, precision: int | None) -> np.ndarray:
+        """
+        Round a value to the given decimal precision.
+
+        Args:
+            value: Value or array to round.
+            precision: Number of decimal places. ``None`` or negative values
+                skip rounding and return the input unchanged.
+
+        Returns:
+            Rounded value (or the original if precision is ``None``/negative).
+        """
         if precision is None or precision < 0:
             return value
         return np.round(value, precision)
 
-    def _hash_solution(self, x: np.ndarray) -> str:
+    def hash_solution(self, x: np.ndarray) -> str:
         """
         Create hash string for a solution.
 
@@ -194,7 +216,7 @@ class BasinHoppingSampler:
                 ):
                     break
 
-                x_perturbed = self._perturbation(current_x, p, bounds_array)
+                x_perturbed = self.perturbation(current_x, p, bounds_array)
                 try:
                     res = minimize(
                         func,
@@ -269,14 +291,14 @@ class BasinHoppingSampler:
             to_x = rec["new_x"]
             to_f = rec["new_f"]
 
-            from_x_rounded = self._round_value(from_x, self.config.coordinate_precision)
-            to_x_rounded = self._round_value(to_x, self.config.coordinate_precision)
+            from_x_rounded = self.round_value(from_x, self.config.coordinate_precision)
+            to_x_rounded = self.round_value(to_x, self.config.coordinate_precision)
 
-            node1 = self._hash_solution(from_x_rounded)
-            node2 = self._hash_solution(to_x_rounded)
+            node1 = self.hash_solution(from_x_rounded)
+            node2 = self.hash_solution(to_x_rounded)
 
-            fit1 = self._round_value(from_f, self.config.fitness_precision)
-            fit2 = self._round_value(to_f, self.config.fitness_precision)
+            fit1 = self.round_value(from_f, self.config.fitness_precision)
+            fit2 = self.round_value(to_f, self.config.fitness_precision)
 
             trace_records.append(
                 {

@@ -65,6 +65,16 @@ class StepSizeEstimator:
     The search uses a decimal refinement approach, progressively narrowing
     the step size to the configured precision.
 
+    Computational cost:
+        `_compute_escape_rate` is called once per tested step size. Each call runs
+        `n_samples` baseline minimizations and `n_samples * n_perturbations`
+        perturbed minimizations (defaults: 100 + 3000 minimizations per step size).
+        Since multiple step sizes are evaluated during refinement
+        (`search_precision` dependent), total minimizations can become large for
+        expensive objective functions. For expensive objectives, start by reducing
+        `n_samples` and/or `n_perturbations`, then increase them once a reasonable
+        step-size range is identified.
+
     Example:
         >>> import numpy as np
         >>> estimator = StepSizeEstimator()
@@ -94,7 +104,11 @@ class StepSizeEstimator:
         sampler: BasinHoppingSampler,
         rng: np.random.Generator,
     ) -> float:
-        """Compute the average escape rate for a given step size."""
+        """
+        Compute the average escape rate for a given step size.
+
+        Cost per call: `n_samples` + `n_samples * n_perturbations` minimizations.
+        """
         bounds_array = domain_array if self.config.bounded else None
         p = step_size * np.abs(domain_array[:, 1] - domain_array[:, 0])
 
@@ -110,11 +124,11 @@ class StepSizeEstimator:
                 bounds=bounds_array,
             )
             optimum = res.x
-            optimum_hash = sampler._hash_solution(optimum)
+            optimum_hash = sampler.hash_solution(optimum)
 
             escapes = 0
             for _ in range(self.config.n_perturbations):
-                x_perturbed = sampler._perturbation(optimum, p, bounds_array)
+                x_perturbed = sampler.perturbation(optimum, p, bounds_array)
                 res_perturbed = minimize(
                     func,
                     x_perturbed,
@@ -122,7 +136,7 @@ class StepSizeEstimator:
                     options=self.config.minimizer_options,
                     bounds=bounds_array,
                 )
-                new_hash = sampler._hash_solution(res_perturbed.x)
+                new_hash = sampler.hash_solution(res_perturbed.x)
                 if new_hash != optimum_hash:
                     escapes += 1
 
